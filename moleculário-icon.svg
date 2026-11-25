@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 88" role="img" aria-labelledby="title desc">
+  <title id="title">Moleculário: molibdênio 42</title>
+  <desc id="desc">Uma célula da tabela periódica com o número atômico 42 e o símbolo Mo, acompanhada por ligações moleculares.</desc>
+  <rect x="1" y="1" width="86" height="86" rx="22" fill="#e8f4ef"/>
+  <rect x="12" y="8" width="59" height="69" rx="9" fill="#fff" stroke="#247c68" stroke-width="2.5"/>
+  <text x="19" y="23" fill="#247c68" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="700">42</text>
+  <text x="41.5" y="54" text-anchor="middle" fill="#174b40" font-family="system-ui,-apple-system,sans-serif" font-size="28" font-weight="750" letter-spacing="-1.5">Mo</text>
+  <path d="M67 67 75 76 83 68" fill="none" stroke="#68a593" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="67" cy="67" r="3.5" fill="#e8f4ef" stroke="#247c68" stroke-width="2"/>
+  <circle cx="75" cy="76" r="3.5" fill="#e8f4ef" stroke="#247c68" stroke-width="2"/>
+  <circle cx="83" cy="68" r="3.5" fill="#e8f4ef" stroke="#247c68" stroke-width="2"/>
+</svg>
