@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-vGlOlWra8xo3JShQdpWIXArXkh0IOZzQB1R+iMYNtpw='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7RK9EDm5ugN+Wen4Wz234KCw9toF7/lZdf2Ar/dpilw='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Editor de moléculas simples, executado no navegador.">
 <meta property="og:title" content="Moleculário – Editor molecular">
@@ -122,8 +122,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 .panel-3d .viewer-popover{position:absolute;left:50%;right:auto;bottom:calc(100% + 8px);top:auto;transform:translateX(-50%);display:flex;flex-direction:column;align-items:stretch;gap:6px;max-height:calc(100vh - 150px);max-height:calc(100dvh - 150px);overflow-y:auto;padding:8px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.97);box-shadow:0 8px 22px rgba(18,42,35,.16);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .panel-3d .viewer-controls button:disabled{opacity:.55;cursor:not-allowed}
 .panel-3d .panel-switch-controls{right:10px;bottom:10px}
-.panel-3d #info3d{top:10px;left:12px;bottom:auto;max-width:calc(100% - 260px)}
-@media(max-width:560px){.panel-3d #info3d{top:92px;max-width:calc(100% - 24px)}}
+.panel-3d #info3d{left:50%;bottom:66px;top:auto;max-width:calc(100% - 20px);transform:translateX(-50%);text-align:center}
 @media(max-width:360px){.panel-3d .viewer-float-tools{gap:1px;padding:3px}.panel-3d .viewer-float-tools button{width:36px;min-width:36px;height:36px;min-height:36px}.panel-3d .viewer-float-tools svg{width:19px;height:19px}}
 .panel-3d .viewer-popover[hidden]{display:none}
 .panel-3d .vibration-panel{width:198px}
@@ -178,9 +177,9 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 .panel-2d .toolbar .icon-select:after{position:absolute;right:5px;top:50%;width:5px;height:5px;border-right:1.4px solid currentColor;border-bottom:1.4px solid currentColor;content:"";transform:translateY(-70%) rotate(45deg);pointer-events:none}
 .panel-2d .toolbar #ringMenuWrap.on:after{border-color:var(--white)}
 .panel-2d .toolbar .periodic-icon rect{fill:none;stroke:currentColor;stroke-width:1.5;rx:1}
-.panel-2d .canvas-controls{position:absolute;z-index:5;left:50%;bottom:10px;transform:translateX(-50%)}
-.panel-2d .canvas-float-tools{display:flex;flex-direction:row;gap:2px;width:max-content;padding:4px;border:1px solid rgba(219,229,224,.9);border-radius:10px;background:rgba(255,255,255,.92);box-shadow:0 4px 14px rgba(18,42,35,.12);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.panel-2d .canvas-float-tools button{display:inline-flex;align-items:center;justify-content:center;width:40px;min-width:40px;height:40px;min-height:40px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--text-ui);box-shadow:none;font-size:13px}
+.panel-2d .canvas-controls{position:absolute;z-index:5;left:50%;bottom:10px;width:max-content;max-width:calc(100% - 20px);transform:translateX(-50%)}
+.panel-2d .canvas-float-tools{display:flex;flex-direction:row;gap:2px;width:max-content;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:4px;border:1px solid rgba(219,229,224,.9);border-radius:10px;background:rgba(255,255,255,.92);box-shadow:0 4px 14px rgba(18,42,35,.12);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);scrollbar-width:thin;overscroll-behavior-x:contain;touch-action:pan-x}
+.panel-2d .canvas-float-tools button{display:inline-flex;flex:none;align-items:center;justify-content:center;width:40px;min-width:40px;height:40px;min-height:40px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--text-ui);box-shadow:none;font-size:13px}
 .panel-2d .canvas-float-tools button:hover{background:var(--surface-hover);border:0;box-shadow:none}
 .panel-2d .canvas-float-tools button.on{background:var(--ac);color:var(--white)}
 .panel-2d .canvas-float-tools #btnClear svg{display:block;width:20px;height:20px}
@@ -202,6 +201,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 .panel-2d .canvas-controls .extras-panel input[type=checkbox]:checked::before{transform:translateX(13px)}
 .panel-2d #info2d{left:50%;bottom:66px;max-width:calc(100% - 20px);transform:translateX(-50%);text-align:center}
 .panel-2d .panel-switch-controls{right:10px;bottom:10px}
+@media(max-width:820px){.panel-2d .canvas-controls{max-width:calc(100% - 136px)}}
 @media(max-width:360px){#potentialLegend{width:calc(100% - 116px)}.panel-2d .canvas-float-tools{gap:1px;padding:3px}.panel-2d .canvas-float-tools button{width:36px;min-width:36px;height:36px;min-height:36px}.panel-2d .canvas-float-tools #btnUndo svg,.panel-2d .canvas-float-tools #btnRedo svg{width:19px;height:19px}}
 .toolbar button[data-bond-style] svg{display:inline-block;vertical-align:middle;width:20px;height:20px}
 .toolbar button[data-bond-style="wedge"] path{fill:currentColor;stroke:currentColor;stroke-width:.8;stroke-linejoin:round}
@@ -313,7 +313,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
         <div class="extras-panel" id="extrasPanel" hidden>
           <label title="Inferir algumas cargas formais automaticamente; desative para voltar à edição manual"><input type="checkbox" id="chkAutoCharge" checked> Cargas automáticas</label>
           <button id="btnClean" title="Reorganizar" aria-label="Reorganizar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="11.5" cy="14" rx="7" ry="3.1"></ellipse><ellipse cx="11.5" cy="14" rx="7" ry="3.1" transform="rotate(60 11.5 14)"></ellipse><ellipse cx="11.5" cy="14" rx="7" ry="3.1" transform="rotate(-60 11.5 14)"></ellipse><circle cx="11.5" cy="14" r="1.4"></circle><path class="sparkle" d="M19.5 2.5c.25 1.45.8 2 2.25 2.25-1.45.25-2 .8-2.25 2.25-.25-1.45-.8-2-2.25-2.25 1.45-.25 2-.8 2.25-2.25Z"></path></svg>Reorganizar</button>
-          <button id="btnIUPAC" title="Gerar um nome IUPAC para a estrutura desenhada" aria-label="Gerar nome IUPAC">Nome IUPAC</button>
+          <button id="btnIUPAC" title="Copiar nome IUPAC para a área de transferência" aria-label="Copiar nome IUPAC">Nome IUPAC</button>
         </div>
       </div>
       <div class="panel-switch-controls" role="group" aria-label="Alternar painel">
@@ -379,13 +379,6 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 <datalist id="molList"></datalist>
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-<dialog id="dlgIUPAC" aria-labelledby="dlgIUPACTitle">
-  <h3 id="dlgIUPACTitle">Nome IUPAC</h3>
-  <div id="iupacStatus" role="status" aria-live="polite">Nome gerado para a estrutura atual:</div>
-  <textarea id="iupacResult" style="height:64px" readonly></textarea>
-  <p style="font-size:12px;color:#64746d;line-height:1.45">O gerador local cobre cadeias orgânicas simples e ramificadas, insaturações, alguns grupos funcionais e anéis simples. Estruturas com estereoquímica, anéis fundidos, sais ou grupos fora desse escopo podem não receber um nome.</p>
-  <div class="row"><button id="iupacCopy">Copiar nome</button><span style="flex:1"></span><button class="close">Fechar</button></div>
-</dialog>
 <dialog id="dlgCustomRing" aria-labelledby="dlgCustomRingTitle">
   <h3 id="dlgCustomRingTitle">Anel personalizado</h3>
   <p>Escolha o número de átomos de carbono. Depois, clique no canvas para posicionar o anel.</p>
@@ -394,9 +387,9 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 </dialog>
 <dialog id="dlgCredits" aria-labelledby="dlgCreditsTitle">
   <h3 id="dlgCreditsTitle">Créditos e referências</h3>
-  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.7.0.1<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
+  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.7.1<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
   <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. O conversor IUPAC é parcial; a animação vibracional é qualitativa e não calcula frequências espectroscópicas.</p>
-  <p><b>Desenvolvimento:</b> este app foi feito por ChatGPT (OpenAI) e Claude (Anthropic), com base nas orientações do usuário.</p>
+  <p><b>Desenvolvimento:</b> este app foi feito por ChatGPT (OpenAI), Claude (Anthropic) e Gemini (Google), com base nas orientações do usuário.</p>
   <ul>
     <li><b>SMILES e nomenclatura:</b> <a href="https://opensmiles.org/opensmiles.pdf" target="_blank" rel="noopener noreferrer">OpenSMILES</a> (subconjunto) e <a href="https://iupac.qmul.ac.uk/BlueBook/" target="_blank" rel="noopener noreferrer">IUPAC Blue Book</a> (P-1, P-4 e P-9).</li>
     <li><b>Cargas parciais:</b> método de Gasteiger e Marsili, <i>Tetrahedron</i> 36 (1980), 3219–3228 (<a href="https://doi.org/10.1016/0040-4020(80)80168-2" target="_blank" rel="noopener noreferrer">DOI</a>). Os coeficientes usados para H, C, N, O, F, P (sp3), Cl, Br, I, S (incluindo so2 para grupos sulfonila) e Si vêm da tabela Gasteiger do <a href="https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/PartialCharges/GasteigerParams.cpp" target="_blank" rel="noopener noreferrer">RDKit</a>; redistribuídos sob BSD 3-Clause, com aviso abaixo. O cálculo local simplifica o método e distribui por ressonância as cargas formais dos oxigênios equivalentes em carboxilatos e grupos nitro.</li>
@@ -882,24 +875,18 @@ function moleculeGraphSignature(){
   const bonds=mol.bonds.map(b=>Math.min(b.a,b.b)+'-'+Math.max(b.a,b.b)+':'+b.o+':'+(b.dir||'')+':'+(b.dirFrom||'')+':'+(b.stereoStyle||'')+':'+(b.stereoFrom||'')).sort().join('|');
   return atoms+'#'+bonds;
 }
-function hasSpecifiedDoubleStereo(){
-  for(const db of mol.bonds)if(db.o===2){
-    const marked=[db.a,db.b].map(center=>mol.bonds.some(b=>b.o===1&&b.dir&&(b.a===center||b.b===center)&&(b.a===center?b.b:b.a)!==(center===db.a?db.b:db.a)));
-    if(marked.every(Boolean))return true;
-  }
-  return false;
-}
 function updateInfo2D(){
   if(!mol.atoms.length){$('#info2d').innerHTML='Editor vazio';
     return;
   }
   const s=stats(),bad=mol.atoms.filter(a=>a._valenceWarning).length;
   const metadata=moleculeMetadata&&moleculeMetadata.signature===moleculeGraphSignature()?moleculeMetadata:null;
-  const sameName=metadata&&metadata.iupac&&norm(metadata.name||'')===norm(metadata.iupac);
-  const names=metadata&&(metadata.name||metadata.iupac)?'<br><span>'+(sameName?'IUPAC: '+escapeMarkup(metadata.iupac):escapeMarkup(metadata.name||'')+(metadata.iupac?' · IUPAC: '+escapeMarkup(metadata.iupac):''))+'</span>':'';
-  const specifiedStereo=mol.atoms.some(a=>a.stereo)||hasSpecifiedDoubleStereo();
-  const stereoTestNotice=specifiedStereo&&metadata&&metadata.stereoInput?'<br><span style="color:#8a4b08">⚠ A interpretação da estereoquímica em nomes IUPAC e SMILES ainda está em testes.</span>':'';
-  $('#info2d').innerHTML='<b>'+s.f+'</b> · '+s.mw.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' g/mol'+names+(bad?' · <span style="color:#b42318">⚠ '+bad+' valência(s) fora do modelo automático</span>':'')+stereoTestNotice;
+  let iupac='';
+  try{iupac=currentIUPACName()||'';}catch(_){iupac='';}
+  const commonName=metadata&&metadata.name?metadata.name:'';
+  const nameParts=commonName&&iupac&&norm(commonName)!==norm(iupac)?[commonName,iupac]:[iupac||commonName].filter(Boolean);
+  const names=nameParts.length?'<br><span>'+nameParts.map(escapeMarkup).join(' · ')+'</span>':'';
+  $('#info2d').innerHTML='<b>'+s.f+'</b> · '+s.mw.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' g/mol'+names+(bad?' · <span style="color:#b42318">⚠ '+bad+' valência(s) fora do modelo automático</span>':'');
 }
 let geomRevision=0,geometryTaskStatus='idle',layoutTaskStatus='idle',layoutTaskId=0;
 function changed(){
@@ -3654,10 +3641,11 @@ function draw3DOverlays(ctx,P,project,visible,dpr,scale){
       const p0=project(positive),p1=project(negative),dx=p1.x-p0.x,dy=p1.y-p0.y,pixelLen=Math.hypot(dx,dy);
       if(pixelLen<12)continue;
       const ux=dx/pixelLen,uy=dy/pixelLen,px=-uy,py=ux;
-      const worldLen=Math.hypot(negative.a.x-positive.a.x,negative.a.y-positive.a.y,negative.a.z-positive.a.z);
-      const maxLen=Math.min(pixelLen*.68,48),arrowLen=Math.max(6,maxLen*Math.min(1,deltaEN*worldLen/1.9));
-      const mx=(p0.x+p1.x)*.5,my=(p0.y+p1.y)*.5,tx=mx-ux*arrowLen*.5,ty=my-uy*arrowLen*.5;
-      const hx=mx+ux*arrowLen*.5,hy=my+uy*arrowLen*.5,head=Math.min(11,Math.max(5.5,arrowLen*.4)),shaftW=Math.min(4.5,2.4+deltaEN*.75);
+      const endInset=Math.min(pixelLen*.14,12);
+      const tx=p0.x+ux*endInset,ty=p0.y+uy*endInset;
+      const hx=p1.x-ux*endInset,hy=p1.y-uy*endInset;
+      const arrowLen=Math.hypot(hx-tx,hy-ty);
+      const head=Math.min(12,arrowLen*.55,Math.max(5.5,arrowLen*.24)),shaftW=Math.min(4.5,2.4+deltaEN*.75);
       // Halo branco + contorno escuro mantêm o vetor legível em fundos e cores MEP variados.
       ctx.strokeStyle='rgba(0,0,0,.9)';
       ctx.lineWidth=shaftW+5.4;
@@ -4299,19 +4287,19 @@ function searchMol(q){
   const iupac=m=>norm(IUPAC_NAMES[norm(m[0][0])]||'');
   const hit=LIB.find(m=>m[0].some(x=>norm(x)===nq))||LIB.find(m=>iupac(m)===nq);
   if(hit){const name=hit[0][0],iupac=IUPAC_NAMES[norm(name)]||'';
-    loadSMILES(hit[1],{name,iupac,stereoInput:nq===norm(iupac)?'iupac':null}).catch(e=>{if(!e.cancelled)toast('Não foi possível carregar a molécula ('+e.message+')');});
+    loadSMILES(hit[1],{name,iupac}).catch(e=>{if(!e.cancelled)toast('Não foi possível carregar a molécula ('+e.message+')');});
     return;
   }
   let named;
   try{named=parseIUPACName(q);}catch(error){toast('Nome IUPAC inválido: '+error.message);return;}
   if(named){
-    loadNamedGraph(named,{name:q.trim(),iupac:q.trim(),stereoInput:'iupac'}).catch(e=>{if(!e.cancelled)toast('Não foi possível interpretar esse nome ('+e.message+')');});
+    loadNamedGraph(named,{name:q.trim(),iupac:q.trim()}).catch(e=>{if(!e.cancelled)toast('Não foi possível interpretar esse nome ('+e.message+')');});
     return;
   }
   let smilesError=null;
   try{MoleculeIO.parseSMILES(q);}catch(error){smilesError=error;}
   if(!smilesError){
-    loadSMILES(q,{stereoInput:'smiles'}).catch(e=>{if(!e.cancelled)toast('Não foi possível carregar esse SMILES ('+e.message+')');});
+    loadSMILES(q).catch(e=>{if(!e.cancelled)toast('Não foi possível carregar esse SMILES ('+e.message+')');});
     return;
   }
   const findPartial=match=>LIB.find(m=>m[0].some(x=>match(norm(x)))||match(iupac(m)));
@@ -5107,19 +5095,39 @@ $('#moreEl').onchange=e=>{if(e.target.value){curEl=e.target.value;
 $('#btnUndo').onclick=undo;
 $('#btnRedo').onclick=redo;
 $('#btnClean').onclick=()=>cleanUp().catch(e=>{if(!e.cancelled)toast('Não foi possível reorganizar o desenho ('+e.message+')');});
+function copyTextFallback(text){
+  const area=document.createElement('textarea');
+  area.value=text;
+  area.setAttribute('readonly','');
+  area.style.cssText='position:fixed;left:-9999px;opacity:0';
+  document.body.appendChild(area);
+  area.select();
+  area.setSelectionRange(0,text.length);
+  let ok=false;
+  try{ok=document.execCommand('copy');}
+  finally{area.remove();}
+  return ok;
+}
+function closeExtrasPanel(){
+  const button=$('#btnExtras'),panel=$('#extrasPanel');
+  panel.hidden=true;
+  button.setAttribute('aria-expanded','false');
+  button.classList.remove('on');
+}
 $('#btnIUPAC').onclick=()=>{
-  let name=null,error=null;
+  closeExtrasPanel();
+  if(!mol.atoms.length){toast('Desenhe ou carregue uma estrutura primeiro.');return;}
+  let name=null;
   try{name=currentIUPACName();}
-  catch(e){error=e;}
-  $('#iupacResult').value=name||'';
-  $('#iupacStatus').textContent=error?'O gerador encontrou um erro: '+(error.message||'falha inesperada.'):!mol.atoms.length?'Desenhe ou carregue uma estrutura primeiro.':name?'Nome gerado para a estrutura atual.':'Não foi possível gerar um nome dentro do escopo local deste app.';
-  $('#iupacCopy').disabled=!name;
-  $('#dlgIUPAC').showModal();
-};
-$('#iupacCopy').onclick=()=>{
-  const value=$('#iupacResult').value;if(!value)return;
-  try{navigator.clipboard.writeText(value).then(()=>toast('Nome IUPAC copiado'),()=>{const t=$('#iupacResult');t.select();document.execCommand('copy');toast('Nome IUPAC copiado');});}
-  catch(e){const t=$('#iupacResult');t.select();document.execCommand('copy');toast('Nome IUPAC copiado');}
+  catch(e){toast('Não foi possível gerar o nome IUPAC ('+(e.message||'falha inesperada')+').');return;}
+  if(!name){toast('Não foi possível gerar um nome dentro do escopo local deste app.');return;}
+  const onCopied=()=>toast('Nome IUPAC copiado: '+name);
+  const onFailed=()=>{
+    if(copyTextFallback(name))onCopied();
+    else toast('Não foi possível copiar o nome IUPAC.');
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(name).then(onCopied,onFailed);
+  else onFailed();
 };
 $('#chkAutoCharge').onchange=e=>{autoFormalCharges=e.target.checked;
   changed();
