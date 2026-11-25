@@ -28,4 +28,4 @@ Consulte a seção **Créditos e referências** no app para fontes, métodos e a
 
 ## Licença
 
-O código próprio do projeto está sob a licença BSD 3-Clause. Consulte `LICENSE`. Os parâmetros Gasteiger adaptados do RDKit mantêm o aviso BSD 3-Clause correspondente.
+O código próprio do projeto está sob a licença BSD 3-Clause. Consulte `LICENSE`.
