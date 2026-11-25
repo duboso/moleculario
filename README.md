@@ -14,6 +14,10 @@ Editor de moléculas simples, executado no navegador.
 
 Abra `index.html` em um navegador moderno com JavaScript habilitado. O app é autocontido e não requer instalação de dependências.
 
+## Privacidade
+
+O projeto não coleta, armazena nem envia dados do usuário ou estruturas moleculares para servidores externos. Todo o processamento ocorre localmente no navegador.
+
 ## Limitações
 
 A leitura de SMILES e a conversão de nomes IUPAC são parciais. A geometria 3D, as cargas e o potencial eletrostático são aproximações locais. As animações vibracionais são qualitativas e não calculam frequências espectroscópicas. Os resultados não substituem ferramentas de química computacional validadas.
