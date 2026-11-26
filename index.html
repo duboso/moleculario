@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-NwBtKAtOrOQHSOZ3dw2L7290QtUzdp8IYJvBZg9zKME='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7IUHfaAM4mODs6kWXggwirmpgggVg5UssokrQUFzwsI='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Editor de moléculas simples, executado no navegador.">
 <meta property="og:title" content="Moleculário – Editor molecular">
@@ -397,7 +397,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 </dialog>
 <dialog id="dlgCredits" aria-labelledby="dlgCreditsTitle">
   <h3 id="dlgCreditsTitle">Créditos e referências</h3>
-  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.3<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
+  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.4<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
   <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. A animação vibracional é qualitativa e não calcula frequências espectroscópicas.</p>
   <p><b>Desenvolvimento:</b> este app foi feito por ChatGPT (OpenAI), Claude (Anthropic) e Gemini (Google), com base nas orientações do usuário.</p>
   <ul>
@@ -4321,24 +4321,25 @@ function draw3DOverlays(ctx,P,project,visible,dpr,scale){
       const hx=p1.x-ux*endInset,hy=p1.y-uy*endInset;
       const arrowLen=Math.hypot(hx-tx,hy-ty);
       const head=Math.min(12,arrowLen*.55,Math.max(5.5,arrowLen*.24)),shaftW=Math.min(4.5,2.4+deltaEN*.75);
+      const shaftEndX=hx-ux*head,shaftEndY=hy-uy*head;
       // Halo branco + contorno escuro mantêm o vetor legível em fundos e cores MEP variados.
       ctx.strokeStyle='rgba(0,0,0,.9)';
       ctx.lineWidth=shaftW+5.4;
       ctx.beginPath();
       ctx.moveTo(tx,ty);
-      ctx.lineTo(hx,hy);
+      ctx.lineTo(shaftEndX,shaftEndY);
       ctx.stroke();
       ctx.strokeStyle='rgba(255,255,255,.98)';
       ctx.lineWidth=shaftW+2.5;
       ctx.beginPath();
       ctx.moveTo(tx,ty);
-      ctx.lineTo(hx,hy);
+      ctx.lineTo(shaftEndX,shaftEndY);
       ctx.stroke();
       ctx.strokeStyle='#ffd84a';
       ctx.lineWidth=shaftW;
       ctx.beginPath();
       ctx.moveTo(tx,ty);
-      ctx.lineTo(hx,hy);
+      ctx.lineTo(shaftEndX,shaftEndY);
       ctx.stroke();
       ctx.fillStyle='#ffd84a';
       ctx.strokeStyle='rgba(0,0,0,.92)';
@@ -5081,6 +5082,24 @@ for(const[lengthText,stem]of Object.entries(IUPAC_STEMS)){
     }
   }
 }
+const IUPAC_ALKYLIDENE_PREFIXES=Object.create(null);
+function alkylidenePrefixName(length,attachment){
+  const stem=IUPAC_STEMS[length];if(!stem||!Number.isInteger(attachment)||attachment<1||attachment>length)return null;
+  if(length===1)return'metilideno';
+  if(length===2)return'etilideno';
+  return attachment===1?stem+'ilideno':stem+'an-'+attachment+'-ilideno';
+}
+for(const[lengthText,stem]of Object.entries(IUPAC_STEMS)){
+  const length=+lengthText;
+  for(let attachment=1;attachment<=length;attachment++){
+    const preferredAttachment=Math.min(attachment,length+1-attachment),name=alkylidenePrefixName(length,preferredAttachment);
+    IUPAC_ALKYLIDENE_PREFIXES[name]={length,attachment:preferredAttachment};
+    IUPAC_PREFIXES[name.replace(/-/g,'')]=name;
+    const english=length===1?'methylidene':length===2?'ethylidene':preferredAttachment===1?stem+'ylidene':stem+'an-'+preferredAttachment+'-ylidene';
+    IUPAC_PREFIXES[english.replace(/-/g,'')]=name;
+    if(length===1)IUPAC_PREFIXES.methanylidene=name;
+  }
+}
 const IUPAC_AMINO_ALKYL_GROUPS=['metil','etil',...Object.keys(IUPAC_ALKYL_PREFIXES).filter(name=>name!=='metan-1-il'&&name!=='etan-1-il')];
 for(const name of IUPAC_AMINO_ALKYL_GROUPS)registerAminoPrefix([name]);
 for(const left of ['metil','etil'])for(const right of ['metil','etil'])if(comparePrefixNames(left,right)<=0)registerAminoPrefix([left,right]);
@@ -5139,13 +5158,35 @@ function parsePrefixNames(raw,allowUnlocated=false){
   Object.defineProperty(out,'hasUnlocated',{value:unlocated>0});
   return out;
 }
-const IUPAC_SUFFIX_COUNT={ol:1,diol:2,triol:3,tetrol:4,pentol:5,tiol:1,ditiol:2,tritiol:3,tetratiol:4,ona:1,diona:2,triona:3,tetraona:4,amina:1,diamina:2,triamina:3,tetramina:4,imina:1,diimina:2,triimina:3,tetraimina:4,sulfonico:1,disulfonico:2,trisulfonico:3,sulfinico:1,disulfinico:2,trisulfinico:3,fosfonico:1,difosfonico:2,trifosfonico:3};
+const IUPAC_MULTIPLIERS=Object.freeze({2:'di',3:'tri',4:'tetra',5:'penta',6:'hexa',7:'hepta',8:'octa',9:'nona',10:'deca',11:'undeca',12:'dodeca',13:'trideca',14:'tetradeca',15:'pentadeca',16:'hexadeca',17:'heptadeca',18:'octadeca',19:'nonadeca',20:'icosa'});
+const IUPAC_MAX_MULTIPLIER_COUNT=Math.max(...Object.keys(IUPAC_MULTIPLIERS).map(Number));
+const IUPAC_SUFFIX_BY_KIND=Object.freeze({
+  alcohol:{1:'ol'},thiol:{1:'tiol'},ketone:{1:'ona'},amine:{1:'amina'},imine:{1:'imina'},
+  aldehyde:{1:'al'},polyAldehyde:{1:'carbaldeido'},amide:{1:'amida'},nitrile:{1:'onitrila'},polyacid:{1:'carboxilico'},
+  sulfonicAcid:{1:'sulfonico'},sulfinicAcid:{1:'sulfinico'},phosphonicAcid:{1:'fosfonico'}
+});
+for(const[count,multiplier]of Object.entries(IUPAC_MULTIPLIERS)){
+  const n=Number(count);
+  for(const[kind,suffixes]of Object.entries(IUPAC_SUFFIX_BY_KIND)){
+    if(kind==='aldehyde'&&n>2)continue;
+    suffixes[n]=kind==='alcohol'?multiplier.replace(/a$/,'')+'ol':kind==='nitrile'?multiplier+'nitrila':multiplier+suffixes[1];
+  }
+}
+const IUPAC_SUFFIX_COUNT=Object.fromEntries(Object.entries(IUPAC_SUFFIX_BY_KIND).flatMap(([kind,suffixes])=>Object.entries(suffixes).map(([count,suffix])=>[suffix,+count])));
+const IUPAC_UNSATURATION_SUFFIX_INFO=Object.create(null);
+for(const[countText,multiplier]of [[1,''],...Object.entries(IUPAC_MULTIPLIERS)]){
+  const count=+countText,doubleSuffix=multiplier+'en',tripleSuffix=multiplier+'in';
+  IUPAC_UNSATURATION_SUFFIX_INFO[doubleSuffix]={kind:'double',count};
+  IUPAC_UNSATURATION_SUFFIX_INFO[tripleSuffix]={kind:'triple',count};
+}
+const IUPAC_UNSATURATION_SUFFIXES=Object.keys(IUPAC_UNSATURATION_SUFFIX_INFO).sort((a,b)=>b.length-a.length).join('|');
 const IUPAC_SUFFIXES=Object.keys(IUPAC_SUFFIX_COUNT).sort((a,b)=>b.length-a.length).join('|');
 const IUPAC_FUNCTIONAL_GROUP_SENIORITY=Object.freeze(['acid','sulfonicAcid','sulfinicAcid','phosphonicAcid','anhydride','ester','acidHalide','amide','imide','nitrile','aldehyde','ketone','alcohol','thiol','amine','imine']);
 function suffixKind(suffix){
   if(suffix.endsWith('tiol'))return'thiol';if(suffix.endsWith('ol'))return'alcohol';if(suffix.endsWith('ona'))return'ketone';
   if(suffix.endsWith('amina'))return'amine';if(suffix.endsWith('imina'))return'imine';if(suffix.endsWith('sulfonico'))return'sulfonicAcid';if(suffix.endsWith('sulfinico'))return'sulfinicAcid';
-  if(suffix.endsWith('fosfonico'))return'phosphonicAcid';
+  if(suffix.endsWith('fosfonico'))return'phosphonicAcid';if(suffix.endsWith('carboxilico'))return'polyacid';if(suffix.endsWith('carbaldeido'))return'polyAldehyde';
+  if(suffix.endsWith('amida'))return'amide';if(suffix.endsWith('nitrila')||suffix.endsWith('nitrile'))return'nitrile';if(suffix.endsWith('al'))return'aldehyde';
   return null;
 }
 function suffixNeedsLinkingVowel(suffix){return !/^[aeiou]/i.test(suffix);}
@@ -5154,20 +5195,49 @@ function parseLocantList(raw,expected=null){
   return locants.every(x=>Number.isInteger(x)&&x>=1)&&(!expected||locants.length===expected)?locants:null;
 }
 function parseUnsaturation(raw,rawLocants){
-  const triple=['in','diin','triin'].includes(raw),count=raw.startsWith('tri')?3:raw.startsWith('di')?2:1;
-  const locants=parseLocantList(rawLocants,count);
+  const descriptor=IUPAC_UNSATURATION_SUFFIX_INFO[raw];if(!descriptor)return null;
+  const locants=parseLocantList(rawLocants,descriptor.count);
   if(!locants||new Set(locants).size!==locants.length)return null;
-  return{doubles:triple?[]:locants,triples:triple?locants:[]};
+  return{doubles:descriptor.kind==='double'?locants:[],triples:descriptor.kind==='triple'?locants:[]};
+}
+function parseExtendedUnsaturationTail(tail,n,cyclic){
+  let source=tail,kind=null,locants=[];
+  const locatedSuffix=new RegExp('^(.*?)-(\\d+(?:,\\d+)*)-('+IUPAC_SUFFIXES+')$').exec(source);
+  if(locatedSuffix){
+    kind=suffixKind(locatedSuffix[3]);locants=parseLocantList(locatedSuffix[2],IUPAC_SUFFIX_COUNT[locatedSuffix[3]]);
+    if(!kind||!locants)return null;source=locatedSuffix[1];
+  }else{
+    const directSuffixes=[['onitrila','nitrile',[1]],['nitrile','nitrile',[1]],['amida','amide',[1]],['oico','acid',[1]],['al','aldehyde',[1]],['ona','ketone',cyclic?[1]:(n===3||n===4)?[2]:null]];
+    let found=false;
+    for(const[suffix,candidateKind,defaultLocants]of directSuffixes)if(defaultLocants&&source.endsWith(suffix)){
+      kind=candidateKind;locants=defaultLocants;source=source.slice(0,-suffix.length);found=true;break;
+    }
+    if(!found&&source.endsWith('o'))source=source.slice(0,-1);
+  }
+  const group='(\\d+(?:,\\d+)*)-('+IUPAC_UNSATURATION_SUFFIXES+')';
+  const match=new RegExp('^(?:a-|-)?'+group+'(?:-'+group+')?$').exec(source);if(!match)return null;
+  const first=parseUnsaturation(match[2],match[1]);if(!first)return null;
+  const unsaturationGroups=[first];
+  if(match[3]){const second=parseUnsaturation(match[4],match[3]);if(!second)return null;unsaturationGroups.push(second);}
+  if(unsaturationGroups.length===2&&Boolean(unsaturationGroups[0].doubles.length)===Boolean(unsaturationGroups[1].doubles.length))return null;
+  const doubles=unsaturationGroups.flatMap(group=>group.doubles),triples=unsaturationGroups.flatMap(group=>group.triples),bondLocants=[...doubles,...triples],maximum=cyclic?n:n-1;
+  if(new Set(bondLocants).size!==bondLocants.length||bondLocants.some(loc=>loc<1||loc>maximum))return null;
+  return{kind,doubles,triples,locants};
 }
 function parseParentTail(tail,n,cyclic){
   if(tail==='ano'||tail==='ane')return{kind:null,doubles:[],triples:[],locants:[]};
+  if(cyclic&&tail==='anocarboxilico')return{kind:'ringacid',doubles:[],triples:[],locants:[1]};
+  if(cyclic&&tail==='anocarbaldeido')return{kind:'ringaldehyde',doubles:[],triples:[],locants:[1]};
+  if(cyclic&&tail==='anocarboxamida')return{kind:'ringamide',doubles:[],triples:[],locants:[1]};
   if(tail==='anossulfonico')return{kind:'sulfonicAcid',doubles:[],triples:[],locants:[1]};
   if(tail==='anossulfinico')return{kind:'sulfinicAcid',doubles:[],triples:[],locants:[1]};
-  if(tail==='anoico'||tail==='anoicacid')return{kind:'acid',doubles:[],triples:[],locants:[1]};
+  if(tail==='anoicacid')return{kind:'acid',doubles:[],triples:[],locants:[1]};
+  const acidMultiples=/^an(o?di)?oico$/.exec(tail);
+  if(acidMultiples){const count=acidMultiples[1]?2:1;if(count>n)return null;return{kind:'acid',doubles:[],triples:[],locants:count===1?[1]:[1,n]};}
   if(tail==='anal'||tail==='analdehyde')return{kind:'aldehyde',doubles:[],triples:[],locants:[1]};
   if(tail==='anamida'||tail==='anamide')return{kind:'amide',doubles:[],triples:[],locants:[1]};
   if(tail==='anonitrila'||tail==='anenitrile')return{kind:'nitrile',doubles:[],triples:[],locants:[1]};
-  let nitrileUnsaturation=/^(?:a-|-)?(\d+(?:,\d+)*?)-(trien|dien|en|triin|diin|in)(?:onitrila|enitrila|enitrile|nitrila|nitrile)$/.exec(tail);
+  let nitrileUnsaturation=new RegExp('^(?:a-|-)?(\\d+(?:,\\d+)*?)-('+IUPAC_UNSATURATION_SUFFIXES+')(?:onitrila|enitrila|enitrile|nitrila|nitrile)$').exec(tail);
   if(nitrileUnsaturation){const uns=parseUnsaturation(nitrileUnsaturation[2],nitrileUnsaturation[1]);return uns?{kind:'nitrile',...uns,locants:[1]}:null;}
   let m=new RegExp('^ano-(\\d+(?:,\\d+)*?)-('+IUPAC_SUFFIXES+')$').exec(tail);
   if(m&&suffixNeedsLinkingVowel(m[2])){const locants=parseLocantList(m[1],IUPAC_SUFFIX_COUNT[m[2]]);if(!locants)return null;return{kind:suffixKind(m[2]),doubles:[],triples:[],locants};}
@@ -5181,7 +5251,7 @@ function parseParentTail(tail,n,cyclic){
     const unambiguousOmittedLocant=parentIsVertexTransitive(n,cyclic,[],[],[]);
     if((!m[1]||kind==='thiol'&&unambiguousOmittedLocant)&&locants)return{kind,doubles:[],triples:[],locants};
   }
-  m=new RegExp('^(?:a-|-)?(\\d+(?:,\\d+)*?)-(trien|dien|en|triin|diin|in)(?:o)?(?:-(\\d+(?:,\\d+)*?)-('+IUPAC_SUFFIXES+'))?$').exec(tail);
+  m=new RegExp('^(?:a-|-)?(\\d+(?:,\\d+)*?)-('+IUPAC_UNSATURATION_SUFFIXES+')(?:o)?(?:-(\\d+(?:,\\d+)*?)-('+IUPAC_SUFFIXES+'))?$').exec(tail);
   if(m){
     const uns=parseUnsaturation(m[2],m[1]);if(!uns)return null;
     if(m[4]&&!m[3])return null;
@@ -5189,15 +5259,16 @@ function parseParentTail(tail,n,cyclic){
     if(m[4]&&!locants)return null;
     return{kind:m[4]?suffixKind(m[4]):null,...uns,locants};
   }
-  m=/^(?:a-|-)?(\d+(?:,\d+)*?)-(trien|dien|en|triin|diin|in)oico$/.exec(tail);
+  m=new RegExp('^(?:a-|-)?(\\d+(?:,\\d+)*?)-('+IUPAC_UNSATURATION_SUFFIXES+')oico$').exec(tail);
   if(m){const uns=parseUnsaturation(m[2],m[1]);return uns?{kind:'acid',...uns,locants:[1]}:null;}
-  m=/^(?:a-|-)?(\d+(?:,\d+)*?)-(trien|dien|en|triin|diin|in)al$/.exec(tail);
+  m=new RegExp('^(?:a-|-)?(\\d+(?:,\\d+)*?)-('+IUPAC_UNSATURATION_SUFFIXES+')al$').exec(tail);
   if(m){const uns=parseUnsaturation(m[2],m[1]);return uns?{kind:'aldehyde',...uns,locants:[1]}:null;}
-  m=/^(?:a-)?(\d+(?:,\d+)*)(trien|dien|en|triin|diin|in)o?$/.exec(tail);
+  m=new RegExp('^(?:a-)?(\\d+(?:,\\d+)*?)('+IUPAC_UNSATURATION_SUFFIXES+')o?$').exec(tail);
   if(m){const uns=parseUnsaturation(m[2],m[1]);return uns?{kind:null,...uns,locants:[]}:null;}
   if(tail==='adieno'||tail==='a-1,3-dieno')return{kind:null,doubles:[1,3],triples:[],locants:[]};
   if(tail==='eno'&&(n<=3||cyclic))return{kind:null,doubles:[1],triples:[],locants:[]};
   if(tail==='ino'&&(n<=3||cyclic))return{kind:null,doubles:[],triples:[1],locants:[]};
+  const extended=parseExtendedUnsaturationTail(tail,n,cyclic);if(extended)return extended;
   return null;
 }
 function compareNumberingScores(a,b){for(let i=0;i<Math.max(a.length,b.length);i++){const d=(a[i]??Infinity)-(b[i]??Infinity);if(d)return d;}return 0;}
@@ -5205,10 +5276,11 @@ function numberingScore(parent,prefixes,n,atomMap,bondMap,ignoreUnsaturation=fal
   const atomLoc=loc=>atomMap.get(loc),bondLoc=loc=>bondMap.get(loc);
   const suffix=(parent.locants||[]).map(atomLoc).sort((a,b)=>a-b);
   const unsaturation=ignoreUnsaturation?[]:[...(parent.doubles||[]),...(parent.triples||[])].map(bondLoc).sort((a,b)=>a-b);
+  const doubleUnsaturation=ignoreUnsaturation?[]:(parent.doubles||[]).map(bondLoc).sort((a,b)=>a-b);
   const groups=new Map();for(const p of prefixes){if(!groups.has(p.name))groups.set(p.name,[]);groups.get(p.name).push(atomLoc(p.loc));}
   const names=[...groups.keys()].sort(comparePrefixNames),allLocants=[...groups.values()].flat().sort((a,b)=>a-b);
   const firstPrefix=names.length?groups.get(names[0]).sort((a,b)=>a-b):[];
-  return[...suffix,0,...unsaturation,0,...allLocants,0,...firstPrefix];
+  return[...suffix,0,...unsaturation,0,...doubleUnsaturation,0,...allLocants,0,...firstPrefix];
 }
 function hasPreferredNumbering(parent,prefixes,n,cyclic,ignoreUnsaturation=false){
   const atomIdentity=new Map(Array.from({length:n},(_,i)=>[i+1,i+1]));
@@ -5247,6 +5319,7 @@ function hasLongestNamedParent(parent,prefixes,n,cyclic){
 }
 function addNameAtom(g,el){if(g.atoms.length>=MAX_LAYOUT_ATOMS)throw new Error('A estrutura está limitada a '+MAX_LAYOUT_ATOMS+' átomos.');const i=g.atoms.length;g.atoms.push({el,q:0,x:0,y:0});return i;}
 function addNameBond(g,a,b,o=1){if(g.bonds.length>=MAX_BONDS)throw new Error('A estrutura está limitada a '+MAX_BONDS+' ligações.');g.bonds.push({a,b,o});}
+function setNamedBondOrder(g,a,b,o){const bond=g.bonds.find(edge=>edge.a===a&&edge.b===b||edge.a===b&&edge.b===a);if(!bond)return false;bond.o=o;return true;}
 function addNamedPrefix(g,at,name){
   const aryl=/^(?:(\d+)-)?(hidroxi|metoxi|bromo|cloro|fluoro|iodo)?fenil$/.exec(name);
   if(aryl||name==='fenil'){
@@ -5280,6 +5353,12 @@ function addNamedPrefix(g,at,name){
   if(alkyl){const chain=Array.from({length:alkyl.length},()=>addNameAtom(g,'C'));
     for(let i=1;i<chain.length;i++)addNameBond(g,chain[i-1],chain[i]);
     addNameBond(g,at,chain[alkyl.attachment-1]);
+    return;
+  }
+  const alkylidene=IUPAC_ALKYLIDENE_PREFIXES[name];
+  if(alkylidene){const chain=Array.from({length:alkylidene.length},()=>addNameAtom(g,'C'));
+    for(let i=1;i<chain.length;i++)addNameBond(g,chain[i-1],chain[i]);
+    addNameBond(g,at,chain[alkylidene.attachment-1],2);
     return;
   }
   if(name==='metil'){const a=addNameAtom(g,'C');addNameBond(g,at,a);return;}
@@ -5338,8 +5417,17 @@ function makeNamedChain(n,cyclic,parent,prefixes){
     else if(parent.kind==='phosphonicAcid'){
       const phosphorus=addNameAtom(g,'P'),oxo=addNameAtom(g,'O'),hydroxy1=addNameAtom(g,'O'),hydroxy2=addNameAtom(g,'O');
       addNameBond(g,at,phosphorus);addNameBond(g,phosphorus,oxo,2);addNameBond(g,phosphorus,hydroxy1);addNameBond(g,phosphorus,hydroxy2);
+    }else if(parent.kind==='polyacid'){
+      const carbonyl=addNameAtom(g,'C'),oxo=addNameAtom(g,'O'),hydroxy=addNameAtom(g,'O');
+      addNameBond(g,at,carbonyl);addNameBond(g,carbonyl,oxo,2);addNameBond(g,carbonyl,hydroxy);
+    }else if(parent.kind==='polyAldehyde'){
+      const carbonyl=addNameAtom(g,'C'),oxo=addNameAtom(g,'O');addNameBond(g,at,carbonyl);addNameBond(g,carbonyl,oxo,2);
     }
-    else if(parent.kind==='ketone'||parent.kind==='aldehyde'||parent.kind==='acid'||parent.kind==='amide'){
+    else if(parent.kind==='ringacid'||parent.kind==='ringaldehyde'||parent.kind==='ringamide'){
+      const carbonyl=addNameAtom(g,'C'),oxo=addNameAtom(g,'O');addNameBond(g,at,carbonyl);addNameBond(g,carbonyl,oxo,2);
+      if(parent.kind==='ringacid'){const hydroxy=addNameAtom(g,'O');addNameBond(g,carbonyl,hydroxy);}
+      if(parent.kind==='ringamide'){const nitrogen=addNameAtom(g,'N');addNameBond(g,carbonyl,nitrogen);}
+    }else if(parent.kind==='ketone'||parent.kind==='aldehyde'||parent.kind==='acid'||parent.kind==='amide'){
       const o=addNameAtom(g,'O');addNameBond(g,at,o,2);
       if(parent.kind==='acid'){const oh=addNameAtom(g,'O');addNameBond(g,at,oh);}
       if(parent.kind==='amide'){const a=addNameAtom(g,'N');addNameBond(g,at,a);}
@@ -5721,15 +5809,56 @@ function parseIUPACName(name){
     }
     return applyIUPACStereo(g,stereo,n,cyclic,parent);
   };
+  const replacementMultipliers=Object.fromEntries(Object.entries(IUPAC_MULTIPLIERS).map(([count,prefix])=>[prefix,+count]));
+  const replacementMultiplierNames=Object.keys(replacementMultipliers).sort((a,b)=>b.length-a.length).join('|');
+  const replacementElements={oxa:'O',tia:'S',thia:'S',aza:'N'};
+  const parseReplacementDescriptors=(raw,n,cyclic)=>{
+    const parts=raw.split('-');if(!raw||parts.length%2||parts.some(part=>!part))return null;
+    const replacements=new Map();
+    for(let part=0;part<parts.length;part+=2){
+      if(!/^\d+(?:,\d+)*$/.test(parts[part]))return null;
+      const match=new RegExp('^('+replacementMultiplierNames+')?(oxa|tia|thia|aza)$').exec(parts[part+1]);
+      if(!match)return null;
+      const locants=parseLocantList(parts[part],replacementMultipliers[match[1]]||1),element=replacementElements[match[2]];
+      if(!locants||locants.some(loc=>loc>(n)||(!cyclic&&(loc<=1||loc>=n))||replacements.has(loc)))return null;
+      for(const loc of locants)replacements.set(loc,element);
+    }
+    return replacements.size?replacements:null;
+  };
   for(const[root,n]of IUPAC_ROOTS){
-    const match=s.match(new RegExp('^(\\d+(?:,\\d+)*-)?(di|tri|tetra|penta|hexa|hepta|octa|nona|deca|undeca|dodeca|trideca|tetradeca|pentadeca|hexadeca|heptadeca|octadeca)oxa'+root+'ano$'));
-    if(!match)continue;
-    const locants=match[1]?parseLocantList(match[1].slice(0,-1)):null,count={di:2,tri:3,tetra:4,penta:5,hexa:6,hepta:7,octa:8,nona:9,deca:10,undeca:11,dodeca:12,trideca:13,tetradeca:14,pentadeca:15,hexadeca:16,heptadeca:17,octadeca:18}[match[2]]||0;
-    if(!locants||locants.length!==count||locants.some(loc=>loc<=1||loc>=n)||new Set(locants).size!==locants.length)continue;
-    const graph={atoms:[],bonds:[]};for(let loc=1;loc<=n;loc++)addNameAtom(graph,locants.includes(loc)?'O':'C');
-    for(let i=0;i<n-1;i++)addNameBond(graph,i,i+1);
-    const replacementParent={doubles:[],triples:[],locants:[]};
-    try{return finish(graph,n,false,replacementParent);}catch(error){continue;}
+    const cyclicMarker='ciclo'+root,cyclicAt=s.lastIndexOf(cyclicMarker);
+    if(cyclicAt>=0){
+      const replacementText=s.slice(0,cyclicAt),singleUnlocated=/^(oxa|tia|thia|aza)$/.exec(replacementText),replacements=parseReplacementDescriptors(replacementText,n,true)||(singleUnlocated?new Map([[1,replacementElements[singleUnlocated[1]]]]):null),parent=parseParentTail(s.slice(cyclicAt+cyclicMarker.length),n,true);
+      if(replacements&&parent&&!parent.kind){
+        const graph={atoms:[],bonds:[]};for(let loc=1;loc<=n;loc++)addNameAtom(graph,replacements.get(loc)||'C');
+        for(let loc=1;loc<=n;loc++)addNameBond(graph,loc-1,loc%n,1);
+        for(const loc of parent.doubles||[])setNamedBondOrder(graph,loc-1,loc%n,2);
+        for(const loc of parent.triples||[])setNamedBondOrder(graph,loc-1,loc%n,3);
+        try{
+          const named=finish(graph,n,true,parent),adjacency=graph.atoms.map(()=>[]);
+          for(const bond of graph.bonds){adjacency[bond.a].push({i:bond.b,o:bond.o});adjacency[bond.b].push({i:bond.a,o:bond.o});}
+          const legacySingleLocant=replacements.size===1&&replacements.has(1)&&/^1-(?:oxa|tia|thia|aza)$/.test(replacementText);
+          if(named&&(nameSimpleCyclicReplacement(graph,graph.atoms,adjacency,graph.atoms.map((_,i)=>i))===s||legacySingleLocant))return named;
+        }catch(error){continue;}
+      }
+    }
+    const chainAt=s.lastIndexOf(root);if(chainAt<0)continue;
+    const chainPrefixParts=s.slice(0,chainAt).split('-'),chainReplacementParts=[],isReplacementToken=token=>new RegExp('^(?:'+replacementMultiplierNames+')?(?:oxa|tia|thia|aza)$').test(token);
+    while(chainPrefixParts.length>=2&&isReplacementToken(chainPrefixParts.at(-1))){
+      const token=chainPrefixParts.pop(),locants=chainPrefixParts.pop();chainReplacementParts.unshift(locants,token);
+    }
+    const chainReplacements=parseReplacementDescriptors(chainReplacementParts.join('-'),n,false),chainPrefixes=parsePrefixNames(chainPrefixParts.join('-'),true),chainParent=parseParentTail(s.slice(chainAt+root.length),n,false);
+    if(!chainReplacements||!chainPrefixes||!chainParent||chainParent.kind)continue;
+    const graph={atoms:[],bonds:[]};for(let loc=1;loc<=n;loc++)addNameAtom(graph,chainReplacements.get(loc)||'C');
+    for(let loc=1;loc<n;loc++)addNameBond(graph,loc-1,loc,1);
+    for(const loc of chainParent.doubles||[])setNamedBondOrder(graph,loc-1,loc,2);
+    for(const loc of chainParent.triples||[])setNamedBondOrder(graph,loc-1,loc,3);
+    for(const prefix of chainPrefixes)addNamedPrefix(graph,prefix.loc-1,prefix.name);
+    try{
+      const named=finish(graph,n,false,chainParent),adjacency=graph.atoms.map(()=>[]);
+      for(const bond of graph.bonds){adjacency[bond.a].push({i:bond.b,o:bond.o});adjacency[bond.b].push({i:bond.a,o:bond.o});}
+      if(named&&nameSimpleAcyclicReplacement(graph,graph.atoms,adjacency,graph.atoms.map((_,i)=>i))===s)return named;
+    }catch(error){continue;}
   }
   if(s.startsWith('anidrido')){
     const parts=s.slice('anidrido'.length),acidPairs=[];
@@ -5766,12 +5895,31 @@ function parseIUPACName(name){
     const hydroxy=carbonyl<0?null:adj[carbonyl].find(edge=>graph.atoms[edge.i].el==='O'&&edge.o===1&&adj[edge.i].length===1);if(!hydroxy)return null;
     graph.atoms[hydroxy.i].el=halide;return validateNamedGraph(graph);
   }
-  const bicyclo=s.match(/^(.*?)(?:biciclo|bicyclo)\[(\d+)\.(\d+)\.(\d+)\]([a-z]+?)(?:ano|ane)$/);
-  if(bicyclo){
-    const prefixes=parsePrefixNames(bicyclo[1],true),lengths=bicyclo.slice(2,5).map(Number),count=lengths.reduce((a,b)=>a+b,2),stem=IUPAC_STEMS[count];
-    if(prefixes&&stem===bicyclo[5]&&lengths[0]>=lengths[1]&&lengths[1]>=lengths[2]&&prefixes.every(p=>Number.isInteger(p.loc)&&p.loc>=1&&p.loc<=count)){
-      const graph=buildNamedBicyclo(lengths);
-      if(graph){for(const prefix of prefixes)addNamedPrefix(graph,prefix.loc-1,prefix.name);return finish(graph,count,true,{doubles:[],triples:[],locants:[]});}
+  const vonBaeyer=s.match(/^(.*?)(biciclo|bicyclo|triciclo|tricyclo|tetraciclo|tetracyclo|pentaciclo|pentacyclo|hexaciclo|hexacyclo)\[([^\]]+)\]([a-z]+?)(?:ano|ane)$/);
+  if(vonBaeyer){
+    const ranks={biciclo:2,bicyclo:2,triciclo:3,tricyclo:3,tetraciclo:4,tetracyclo:4,pentaciclo:5,pentacyclo:5,hexaciclo:6,hexacyclo:6},parsed=parseVonBaeyerDescriptor(vonBaeyer[3]),stem=IUPAC_STEMS[parsed?.total];
+    if(parsed&&parsed.cycleRank===ranks[vonBaeyer[2]]&&parsed.total<=20&&stem===vonBaeyer[4]){
+      const prefixParts=vonBaeyer[1].split('-'),replacementParts=[],substituentParts=[];
+      const replacementToken=/^(?:(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca|undeca|dodeca|trideca|tetradeca|pentadeca|hexadeca|heptadeca|octadeca))?(?:oxa|tia|thia|aza)$/;
+      let prefixValid=prefixParts.length===1&&prefixParts[0]==='';
+      if(!prefixValid&&prefixParts.length%2===0){
+        prefixValid=true;
+        for(let partIndex=0;partIndex<prefixParts.length;partIndex+=2){
+          if(!/^\d+(?:,\d+)*$/.test(prefixParts[partIndex])){prefixValid=false;break;}
+          const pair=prefixParts.slice(partIndex,partIndex+2);
+          (replacementToken.test(pair[1])?replacementParts:substituentParts).push(...pair);
+        }
+      }
+      const replacementRaw=replacementParts.join('-'),replacementDescriptors=replacementRaw?parseReplacementDescriptors(replacementRaw,parsed.total,true):null;
+      const substituentText=substituentParts.join('-'),prefixes=parsePrefixNames(substituentText,true);
+      if(prefixValid&&(!replacementRaw||replacementDescriptors)&&prefixes&&prefixes.every(prefix=>Number.isInteger(prefix.loc)&&prefix.loc>=1&&prefix.loc<=parsed.total)){
+        const graph=buildNamedVonBaeyer(parsed);
+        if(graph){
+          for(const[loc,element]of replacementDescriptors||[])graph.atoms[loc-1].el=element;
+          for(const prefix of prefixes)addNamedPrefix(graph,prefix.loc-1,prefix.name);
+          try{return finish(graph,parsed.total,true,{doubles:[],triples:[],locants:[]});}catch(error){/* invalid valence or unsupported substituent */}
+        }
+      }
     }
   }
   const esterName=/^(.*?)oatode(.+?)a$/i.exec(s);
@@ -5790,7 +5938,7 @@ function parseIUPACName(name){
     addNamedPrefix(acidGraph,hydroxyl.i,esterAlkyl);
     return validateNamedGraph(acidGraph);
   }
-  for(const heterocycle of Object.values(HETEROCYCLE_PARENTS)){
+  for(const heterocycle of allHeterocycleParents()){
     const ending=heterocycle.hydride.slice(heterocycle.name.length);
     const heterocycleName=new RegExp('^(.*?)'+heterocycle.name+'(?:'+ending+'|-(\\d+(?:,\\d+)*)-(ona|diona|triona))$').exec(s);
     if(heterocycleName){
@@ -5803,22 +5951,23 @@ function parseIUPACName(name){
       return finish(graph,heterocycle.size,true,parent);
     }
   }
-  const aromaticOxoacid=s.match(/^(.*)benzeno-(\d+(?:,\d+)*)-(di|tri)?(sulfonico|sulfinico|fosfonico)$/);
-  if(aromaticOxoacid){
+  const systematicHantzsch=parseSystematicHantzschName(s);
+  if(systematicHantzsch){
+    const prefixes=parsePrefixNames(systematicHantzsch.prefixes,true);if(!prefixes||prefixes.some(prefix=>prefix.loc>systematicHantzsch.size))return null;
+    const graph={atoms:[],bonds:[]};
+    for(let loc=1;loc<=systematicHantzsch.size;loc++)addNameAtom(graph,systematicHantzsch.heteroAt.get(loc)||'C');
+    for(let loc=0;loc<systematicHantzsch.size;loc++)addNameBond(graph,loc,(loc+1)%systematicHantzsch.size);
+    for(const prefix of prefixes)addNamedPrefix(graph,prefix.loc-1,prefix.name);
+    return finish(graph,systematicHantzsch.size,true,{doubles:[],triples:[],locants:[]});
+  }
+  const aromaticSuffixKinds=['polyacid','polyAldehyde','sulfonicAcid','sulfinicAcid','phosphonicAcid'];
+  const aromaticSuffixes=aromaticSuffixKinds.flatMap(kind=>Object.keys(IUPAC_SUFFIX_BY_KIND[kind])).sort((a,b)=>b.length-a.length).join('|');
+  const aromaticAttachedSuffix=new RegExp('^(.*?)benzeno-(\\d+(?:,\\d+)*)-('+aromaticSuffixes+')$').exec(s);
+  if(aromaticAttachedSuffix){
     if(stereo.length)return null;
-    const prefixes=parsePrefixNames(aromaticOxoacid[1],true),locants=parseLocantList(aromaticOxoacid[2]),multipliers={di:2,tri:3},groupName=aromaticOxoacid[4],oxoCount=groupName==='sulfonico'?2:1;
-    if(prefixes&&locants&&locants.length===(multipliers[aromaticOxoacid[3]]||1)&&locants.every(loc=>loc<=6)){
-      const graph=makeNamedChain(6,true,{kind:null,doubles:[1,3,5],triples:[],locants:[]},prefixes);
-      for(const loc of locants){
-        if(groupName==='fosfonico'){
-          const phosphorus=addNameAtom(graph,'P'),oxo=addNameAtom(graph,'O'),hydroxy1=addNameAtom(graph,'O'),hydroxy2=addNameAtom(graph,'O');
-          addNameBond(graph,loc-1,phosphorus);addNameBond(graph,phosphorus,oxo,2);addNameBond(graph,phosphorus,hydroxy1);addNameBond(graph,phosphorus,hydroxy2);
-        }else{
-          const sulfur=addNameAtom(graph,'S');addNameBond(graph,loc-1,sulfur);for(let i=0;i<oxoCount;i++){const oxo=addNameAtom(graph,'O');addNameBond(graph,sulfur,oxo,2);}const hydroxy=addNameAtom(graph,'O');addNameBond(graph,sulfur,hydroxy);
-        }
-      }
-      return finish(graph,6,true,{doubles:[1,3,5],triples:[],locants:[]});
-    }
+    const kind=suffixKind(aromaticAttachedSuffix[3]),prefixes=parsePrefixNames(aromaticAttachedSuffix[1],true),locants=parseLocantList(aromaticAttachedSuffix[2],IUPAC_SUFFIX_COUNT[aromaticAttachedSuffix[3]]),parent={kind,doubles:[1,3,5],triples:[],locants:locants||[]};
+    if(aromaticSuffixKinds.includes(kind)&&prefixes&&locants&&locants.every(loc=>loc<=6)&&validNamedParent(parent,6,true)&&hasPreferredNumbering(parent,prefixes,6,true))
+      return finish(makeNamedChain(6,true,parent,prefixes),6,true,parent);
   }
   if(s==='fenol')return finish(makeNamedChain(6,true,{kind:null,doubles:[1,3,5]},[{loc:1,name:'hidroxi'}]),6,true,{doubles:[1,3,5]});
   if(s==='benzenamina'||s==='aminobenzeno')return finish(makeNamedChain(6,true,{kind:null,doubles:[1,3,5]},[{loc:1,name:'amino'}]),6,true,{doubles:[1,3,5]});
@@ -5891,14 +6040,25 @@ async function loadNamedGraph(g,metadata){
   if(parseWarning)toast(parseWarning);
 }
 
-/* Parent hydrides for common saturated monocyclic heterocycles. The ring
-   atoms, locants and suffix are derived from the graph/name, not from a
-   molecule-specific template. */
+/* Retained parent hydrides for common small saturated heterocycles. Larger
+   rings use the systematic Hantzsch-Widman size stem and heteroatom prefix. */
 const HETEROCYCLE_PARENTS=Object.freeze({
   'O:3':{name:'oxiran',hydride:'oxirano',size:3,hetero:'O'},'O:4':{name:'oxetan',hydride:'oxetano',size:4,hetero:'O'},'O:5':{name:'oxolan',hydride:'oxolano',size:5,hetero:'O'},'O:6':{name:'oxan',hydride:'oxano',size:6,hetero:'O'},
   'N:3':{name:'aziridin',hydride:'aziridina',size:3,hetero:'N'},'N:4':{name:'azetidin',hydride:'azetidina',size:4,hetero:'N'},'N:5':{name:'pirrolidin',hydride:'pirrolidina',size:5,hetero:'N'},'N:6':{name:'piperidin',hydride:'piperidina',size:6,hetero:'N'},
   'S:3':{name:'tiiran',hydride:'tiirano',size:3,hetero:'S'},'S:4':{name:'tietan',hydride:'tietano',size:4,hetero:'S'},'S:5':{name:'tiolan',hydride:'tiolano',size:5,hetero:'S'},'S:6':{name:'tian',hydride:'tiano',size:6,hetero:'S'}
 });
+const HETEROCYCLE_SIZE_STEMS=Object.freeze({7:'ep',8:'oc',9:'on',10:'ec'});
+const HETEROCYCLE_PREFIXES=Object.freeze({N:'az',O:'ox',S:'ti'});
+function heterocycleParent(element,size){
+  const retained=HETEROCYCLE_PARENTS[element+':'+size];if(retained)return retained;
+  const stem=HETEROCYCLE_SIZE_STEMS[size],prefix=HETEROCYCLE_PREFIXES[element];if(!stem||!prefix)return null;
+  const name=prefix+stem+'an';return{name,hydride:name+'o',size,hetero:element};
+}
+function allHeterocycleParents(){
+  const parents=Object.values(HETEROCYCLE_PARENTS);
+  for(const element of Object.keys(HETEROCYCLE_PREFIXES))for(const size of Object.keys(HETEROCYCLE_SIZE_STEMS))parents.push(heterocycleParent(element,+size));
+  return parents;
+}
 function buildNamedHeterocycle(parent,carbonylLocants=[]){
   const g={atoms:[],bonds:[]},cycle=[];
   for(let loc=1;loc<=parent.size;loc++)cycle.push(addNameAtom(g,loc===1?parent.hetero:'C'));
@@ -5922,6 +6082,80 @@ function buildNamedBicyclo(lengths){
   path3.push(bridgeB);
   for(const path of [path1,path2,path3])for(let i=0;i<path.length-1;i++)addNameBond(g,path[i],path[i+1]);
   return g;
+}
+const HANTZSCH_ELEMENTS=Object.freeze(['O','S','N']);
+const HANTZSCH_PREFIXES=Object.freeze({O:'oxa',S:'tia',N:'aza'});
+function hantzschSaturatedEnding(size,heteroElements){
+  const hasNitrogen=heteroElements.includes('N');
+  if(size===3)return hasNitrogen?'iridina':'irano';
+  if(size===4)return hasNitrogen?'etidina':'etano';
+  if(size===5)return hasNitrogen?'olidina':'olano';
+  if(size===6)return hasNitrogen?'inano':'ano';
+  return({7:'epano',8:'ocano',9:'onano',10:'ecano'})[size]||null;
+}
+function hantzschHydrideName(size,locantsByElement){
+  const elements=HANTZSCH_ELEMENTS.filter(element=>(locantsByElement.get(element)||[]).length);
+  const total=elements.reduce((sum,element)=>sum+locantsByElement.get(element).length,0);
+  if(total<2||size<3||size>10)return null;
+  const ending=hantzschSaturatedEnding(size,elements);if(!ending)return null;
+  const locants=elements.flatMap(element=>locantsByElement.get(element).slice().sort((a,b)=>a-b));
+  const terms=elements.map(element=>{
+    const count=locantsByElement.get(element).length,multiplier=count===1?'':IUPAC_MULTIPLIERS[count];
+    return multiplier===undefined?null:(multiplier||'')+HANTZSCH_PREFIXES[element];
+  });
+  if(terms.some(term=>!term))return null;
+  let prefix='';
+  for(let i=0;i<terms.length;i++){
+    let term=terms[i];
+    if(term.endsWith('a')&&((terms[i+1]||ending)[0]||'').match(/[aeiou]/))term=term.slice(0,-1);
+    prefix+=term;
+  }
+  return locants.join(',')+'-'+prefix+ending;
+}
+function parseSystematicHantzschName(name){
+  if(!/\d+,\d+(?:,\d+)*-/.test(name))return null;
+  const candidates=[];
+  for(let size=3;size<=10;size++)for(let oxygens=0;oxygens<=size;oxygens++)for(let sulfurs=0;sulfurs+oxygens<=size;sulfurs++)for(let nitrogens=0;nitrogens+sulfurs+oxygens<=size;nitrogens++){
+    const counts={O:oxygens,S:sulfurs,N:nitrogens},total=oxygens+sulfurs+nitrogens;if(total<2)continue;
+    const placeholder=new Map(HANTZSCH_ELEMENTS.map(element=>[element,Array.from({length:counts[element]},(_,index)=>index+1)]));
+    const generated=hantzschHydrideName(size,placeholder);if(!generated)continue;
+    const suffix=generated.slice(generated.indexOf('-')+1),escaped=suffix.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const match=new RegExp('^(.*?)(\\d+(?:,\\d+)*-)'+escaped+'$').exec(name);if(!match)continue;
+    const locants=match[2].slice(0,-1).split(',').map(Number);if(locants.length!==total||new Set(locants).size!==total||locants.some(loc=>loc<1||loc>size))continue;
+    let offset=0;const heteroAt=new Map();
+    for(const element of HANTZSCH_ELEMENTS)for(let count=0;count<counts[element];count++)heteroAt.set(locants[offset++],element);
+    candidates.push({size,prefixes:match[1].replace(/-$/,''),heteroAt});
+  }
+  if(!candidates.length)return null;
+  const signature=candidate=>candidate.size+'|'+[...candidate.heteroAt].sort((a,b)=>a[0]-b[0]).map(([loc,element])=>loc+':'+element).join(',')+'|'+candidate.prefixes;
+  return new Set(candidates.map(signature)).size===1?candidates[0]:null;
+}
+function parseVonBaeyerDescriptor(descriptor){
+  const parts=descriptor.split('.');if(parts.length<3)return null;
+  const first=parts.slice(0,3).map(Number);if(first.some(value=>!Number.isInteger(value)||value<0)||first[0]<first[1]||first[1]<first[2]||first[0]<1||first[1]<1)return null;
+  const bridges=[];
+  for(const part of parts.slice(3)){
+    const match=/^(\d+)\^\{?(\d+),(\d+)\}?$/.exec(part);if(!match)return null;
+    const length=+match[1],a=+match[2],b=+match[3];if(a<1||b<=a)return null;
+    bridges.push({length,a,b});
+  }
+  if(bridges.some((bridge,index)=>index&&bridges[index-1].length<bridge.length))return null;
+  return{first,bridges,cycleRank:bridges.length+2,total:first.reduce((sum,value)=>sum+value,2)+bridges.reduce((sum,bridge)=>sum+bridge.length,0)};
+}
+function buildNamedVonBaeyer(parsed){
+  if(!parsed||parsed.total>20||parsed.cycleRank>6)return null;
+  const graph=buildNamedBicyclo(parsed.first);if(!graph)return null;
+  // This path handles independent secondary bridges, whose heads belong to the numbered bicyclic base.
+  const bicyclicSize=graph.atoms.length;
+  for(const bridge of parsed.bridges){
+    if(bridge.a>bicyclicSize||bridge.b>bicyclicSize||bridge.a===bridge.b)return null;
+    let previous=bridge.a-1;
+    for(let i=0;i<bridge.length;i++){
+      const atom=addNameAtom(graph,'C');addNameBond(graph,previous,atom);previous=atom;
+    }
+    addNameBond(graph,previous,bridge.b-1);
+  }
+  return graph.atoms.length===parsed.total?graph:null;
 }
 /* Every naming rule records the exact source vertices and edges represented by its parent, suffixes and prefixes. */
 function createIUPACCoverageLedger(atoms,edges,adj){
@@ -5957,112 +6191,208 @@ function createIUPACCoverageLedger(atoms,edges,adj){
 function iupacCoverageEdgesFromAdj(adj){
   const edges=[];for(let a=0;a<adj.length;a++)for(const edge of adj[a])if(a<edge.i)edges.push({a,c:edge.i,o:edge.o});return edges;
 }
-function nameSimpleBicycloHydrocarbon(atoms,adj,edges,heavy){
-  if(edges.some(e=>e.o!==1)||heavy.some(i=>(atoms[i].q||0)!==0))return null;
-  const carbons=heavy.filter(i=>atoms[i].el==='C');if(carbons.length<4||carbons.length>20)return null;
-  const carbonSet=new Set(carbons),degree=new Map(carbons.map(i=>[i,adj[i].filter(e=>carbonSet.has(e.i)).length])),queue=carbons.filter(i=>degree.get(i)<=1),core=new Set(carbons);
+/* P-23: enumerate maximal simple rings, a main bridge, then independent secondary bridges. */
+function nameSimpleVonBaeyerSystem(atoms,adj,edges,heavy){
+  if(heavy.length<4||heavy.length>40||heavy.some(i=>!['C','N','O','S','F','Cl','Br','I'].includes(atoms[i].el)||(atoms[i].q||0)!==0)||edges.some(edge=>edge.o!==1))return null;
+  const key=(a,b)=>a<b?a+','+b:b+','+a,all=new Set(heavy),degree=new Map(heavy.map(i=>[i,adj[i].filter(edge=>all.has(edge.i)).length])),queue=heavy.filter(i=>degree.get(i)<=1),core=new Set(heavy);
   for(let p=0;p<queue.length;p++){
-    const u=queue[p];if(!core.delete(u))continue;
-    for(const e of adj[u])if(core.has(e.i)){
-      const nextDegree=degree.get(e.i)-1;degree.set(e.i,nextDegree);
-      if(nextDegree===1)queue.push(e.i);
-    }
+    const atom=queue[p];if(!core.delete(atom))continue;
+    for(const edge of adj[atom])if(core.has(edge.i)){const next=degree.get(edge.i)-1;degree.set(edge.i,next);if(next===1)queue.push(edge.i);}
   }
-  if(core.size<4)return null;
-  const coreDegree=i=>adj[i].filter(e=>core.has(e.i)).length;
-  const bridgeheads=[...core].filter(i=>coreDegree(i)===3),other=[...core].filter(i=>coreDegree(i)!==2&&coreDegree(i)!==3);
-  if(bridgeheads.length!==2||other.length||[...core].reduce((n,i)=>n+adj[i].filter(e=>core.has(e.i)).length,0)/2!==core.size+1)return null;
-  const [a,b]=bridgeheads,paths=[];
-  for(const first of adj[a].filter(e=>core.has(e.i))){
-    const path=[a,first.i];let prev=a,cur=first.i,guard=0;
-    while(cur!==b&&guard++<core.size){const next=adj[cur].filter(e=>core.has(e.i)&&e.i!==prev);if(next.length!==1)return null;prev=cur;cur=next[0].i;path.push(cur);}
-    if(cur!==b)return null;paths.push(path);
-  }
-  if(paths.length!==3)return null;
-  const internals=new Set();for(const path of paths)for(const i of path.slice(1,-1)){if(internals.has(i))return null;internals.add(i);}
-  if(internals.size!==core.size-2)return null;
-  const pathLengths=paths.map(path=>path.length-2),lengths=pathLengths.slice().sort((x,y)=>y-x),stem=IUPAC_STEMS[core.size];if(!stem)return null;
-  const assignments=[];
-  const branchLabel=(attachment,edge)=>{
-    const atom=atoms[edge.i];
-    if(edge.o!==1)return null;
-    if(atom.el==='C')return describeAlkyl(edge.i,core,adj,atoms);
-    if(atom.el==='O'){
-      const other=adj[edge.i].filter(x=>x.i!==attachment&&atoms[x.i].el!=='H');
-      if(!other.length)return'hidroxi';
-      if(other.length===1&&atoms[other[0].i].el==='C'&&other[0].o===1){
-        const alkyl=describeAlkyl(other[0].i,new Set([...core,edge.i]),adj,atoms);
-        return alkoxyPrefixFromAlkyl(alkyl);
+  if(core.size<4||core.size>20||[...core].some(atom=>!['C','N','O','S'].includes(atoms[atom].el)))return null;
+  if(heavy.some(atom=>atoms[atom].stereo&&!core.has(atom)))return null;
+  const stereocenters=[...core].filter(atom=>atoms[atom].stereo),cipGraph={atoms,bonds:edges.map(edge=>({a:edge.a,b:edge.c,o:edge.o,dir:edge.dir,dirFrom:edge.dirFrom}))};
+  const coreEdges=[];for(const atom of core)for(const edge of adj[atom])if(core.has(edge.i)&&atom<edge.i)coreEdges.push({a:atom,b:edge.i,o:edge.o});
+  const cycleRank=coreEdges.length-core.size+1;if(cycleRank<2||cycleRank>6)return null;
+  const coreAdj=new Map([...core].map(atom=>[atom,adj[atom].filter(edge=>core.has(edge.i))]));
+  const cycles=[],cycleKeys=new Set();let searchStates=0,searchOverflow=false;
+  for(const start of [...core].sort((x,y)=>x-y)){
+    const path=[start],visited=new Set(path);
+    const walk=current=>{
+      if(searchOverflow)return;if(++searchStates>100000){searchOverflow=true;return;}
+      for(const edge of coreAdj.get(current)){
+        if(edge.i===start&&path.length>=3){
+          const edgeKeys=path.map((atom,index)=>key(atom,path[(index+1)%path.length])).sort(),signature=edgeKeys.join('|');
+          if(!cycleKeys.has(signature)){cycleKeys.add(signature);cycles.push({path:path.slice(),edgeKeys:new Set(edgeKeys)});}continue;
+        }
+        if(edge.i<=start||visited.has(edge.i)||path.length>=core.size)continue;
+        visited.add(edge.i);path.push(edge.i);walk(edge.i);path.pop();visited.delete(edge.i);
       }
+    };
+    walk(start);if(searchOverflow)return null;
+  }
+  if(!cycles.length)return null;
+  const bridgePaths=cycle=>{
+    const ring=new Set(cycle.path),found=[],signatures=new Set();let states=0,overflow=false;
+    const save=path=>{const edgeKeys=path.slice(0,-1).map((atom,index)=>key(atom,path[index+1])).sort(),signature=edgeKeys.join('|');if(!signatures.has(signature)){signatures.add(signature);found.push(path.slice());}};
+    for(const start of cycle.path){
+      const path=[start],seen=new Set(path);
+      const walk=current=>{
+        if(overflow)return;if(++states>50000){overflow=true;return;}
+        for(const edge of coreAdj.get(current)){
+          if(ring.has(edge.i)){
+            if(edge.i!==start&&!cycle.edgeKeys.has(key(current,edge.i)))save([...path,edge.i]);
+            continue;
+          }
+          if(seen.has(edge.i)||path.length>=core.size)continue;
+          seen.add(edge.i);path.push(edge.i);walk(edge.i);path.pop();seen.delete(edge.i);
+        }
+      };
+      walk(start);if(overflow)return null;
     }
-    if(atom.el==='N'&&adj[edge.i].filter(x=>atoms[x.i].el!=='H').length===1)return'amino';
-    if(({F:1,Cl:1,Br:1,I:1})[atom.el]&&adj[edge.i].filter(x=>atoms[x.i].el!=='H').length===1)return({F:'fluoro',Cl:'cloro',Br:'bromo',I:'iodo'})[atom.el];
+    return found;
+  };
+  const ringRoutes=(cycle,start,end)=>{
+    const index=cycle.path.indexOf(start),target=cycle.path.indexOf(end),routes=[];
+    for(const direction of [1,-1]){
+      const route=[start];let cursor=index;
+      while(cursor!==target&&route.length<=cycle.path.length){cursor=(cursor+direction+cycle.path.length)%cycle.path.length;route.push(cycle.path[cursor]);}
+      if(route.at(-1)===end)routes.push(route);
+    }
+    return routes;
+  };
+  const extractSecondaryBridges=(baseAtoms,baseEdges)=>{
+    const remaining=coreEdges.filter(edge=>!baseEdges.has(key(edge.a,edge.b))),residualAdj=new Map([...core].map(atom=>[atom,[]]));
+    for(const edge of remaining){residualAdj.get(edge.a).push(edge);residualAdj.get(edge.b).push(edge);}
+    const used=new Set(),bridges=[];
+    for(const endpoint of baseAtoms)for(const firstEdge of residualAdj.get(endpoint)){
+      const firstKey=key(firstEdge.a,firstEdge.b);if(used.has(firstKey))continue;
+      const path=[endpoint];let current=endpoint,edge=firstEdge,guard=0;
+      while(guard++<=core.size){
+        const edgeKey=key(edge.a,edge.b);if(used.has(edgeKey))return null;used.add(edgeKey);
+        const next=edge.a===current?edge.b:edge.a;path.push(next);
+        if(baseAtoms.has(next)){if(next===endpoint)return null;bridges.push(path.slice());break;}
+        const options=residualAdj.get(next);if(!options||options.length!==2)return null;
+        const nextEdge=options.find(candidate=>key(candidate.a,candidate.b)!==edgeKey);if(!nextEdge)return null;
+        current=next;edge=nextEdge;
+      }
+      if(guard>core.size+1)return null;
+    }
+    if(used.size!==remaining.length)return null;
+    const covered=new Set(baseAtoms);
+    for(const bridge of bridges)for(const atom of bridge.slice(1,-1)){if(covered.has(atom))return null;covered.add(atom);}
+    return covered.size===core.size?bridges:null;
+  };
+  const branchLabel=(attachment,edge,blocked)=>{
+    const atom=atoms[edge.i];if(edge.o!==1)return null;
+    if(atom.el==='C')return describeAlkyl(edge.i,blocked,adj,atoms);
+    if(atom.el==='O'){
+      const other=adj[edge.i].filter(item=>item.i!==attachment&&atoms[item.i].el!=='H');
+      if(!other.length)return'hidroxi';
+      if(other.length===1&&atoms[other[0].i].el==='C'&&other[0].o===1){const alkyl=describeAlkyl(other[0].i,new Set([...blocked,edge.i]),adj,atoms);return alkoxyPrefixFromAlkyl(alkyl);}
+    }
+    if(atom.el==='N'&&adj[edge.i].filter(item=>atoms[item.i].el!=='H').length===1)return'amino';
+    if(({F:1,Cl:1,Br:1,I:1})[atom.el]&&adj[edge.i].filter(item=>atoms[item.i].el!=='H').length===1)return({F:'fluoro',Cl:'cloro',Br:'bromo',I:'iodo'})[atom.el];
     return null;
   };
-  for(let i=0;i<3;i++)for(let j=0;j<3;j++)if(i!==j&&pathLengths[i]>=pathLengths[j]){
-    const k=3-i-j;if(pathLengths[j]<pathLengths[k])continue;
-    for(const start of [a,b]){
-      const end=start===a?b:a,orient=path=>path[0]===start?path:path.slice().reverse();
-      const p1=orient(paths[i]),p2=orient(paths[j]),p3=orient(paths[k]);
-      if(p1[0]!==start||p1[p1.length-1]!==end||p2[0]!==start||p2[p2.length-1]!==end||p3[0]!==start||p3[p3.length-1]!==end)continue;
-      const order=[...p1,...p2.slice(1,-1).reverse(),...p3.slice(1,-1)];
-      if(order.length!==core.size||new Set(order).size!==core.size)continue;
-      const coverage=createIUPACCoverageLedger(atoms,edges,adj),groups=new Map(),accounted=new Set(core);let valid=true;
-      for(const atomIndex of core)if(!coverage.markAtom(atomIndex))valid=false;
-      for(const path of [p1,p2,p3])for(let p=0;p<path.length-1;p++)if(!coverage.markBond(path[p],path[p+1]))valid=false;
-      for(let loc=0;loc<order.length&&valid;loc++)for(const edge of adj[order[loc]])if(!core.has(edge.i)&&atoms[edge.i].el!=='H'){
-        const label=branchLabel(order[loc],edge);if(!label){valid=false;break;}
-        if(!groups.has(label))groups.set(label,[]);groups.get(label).push(loc+1);
-        const fragment=new Set(collectConnectedAtoms(edge.i,core,adj,atoms));
-        if(!coverage.markAttachedFragment(fragment,core,order[loc],edge.i)){valid=false;break;}
-        for(const atomIndex of fragment)accounted.add(atomIndex);
+  const compareVectors=(left,right)=>{for(let i=0;i<Math.max(left.length,right.length);i++){const difference=(left[i]??Infinity)-(right[i]??Infinity);if(difference)return difference;}return 0;};
+  const rankNames={2:'biciclo',3:'triciclo',4:'tetraciclo',5:'pentaciclo',6:'hexaciclo'},candidates=[];let assignmentStates=0;
+  for(const cycle of cycles){
+    const mains=bridgePaths(cycle);if(!mains)continue;
+    for(const mainBridge of mains){
+      const first=mainBridge[0],last=mainBridge.at(-1),baseAtoms=new Set([...cycle.path,...mainBridge.slice(1,-1)]),baseEdges=new Set([...cycle.edgeKeys,...mainBridge.slice(0,-1).map((atom,index)=>key(atom,mainBridge[index+1]))]);
+      const secondary=extractSecondaryBridges(baseAtoms,baseEdges);if(!secondary||secondary.length!==cycleRank-2)continue;
+      for(const start of [first,last]){
+        const end=start===first?last:first,orientedMain=mainBridge[0]===start?mainBridge:mainBridge.slice().reverse(),routes=ringRoutes(cycle,start,end);
+        if(routes.length!==2)continue;
+        for(let longIndex=0;longIndex<2;longIndex++){
+          const longRoute=routes[longIndex],otherRoute=routes[1-longIndex];if(longRoute.length<otherRoute.length)continue;
+          const baseOrder=[...longRoute,...otherRoute.slice(1,-1).reverse(),...orientedMain.slice(1,-1)];
+          if(baseOrder.length!==baseAtoms.size||new Set(baseOrder).size!==baseOrder.length)continue;
+          if(++assignmentStates>20000)return null;
+          const baseLocants=new Map(baseOrder.map((atom,index)=>[atom,index+1]));
+          // P-23 separates bridge citation order from the order used to number bridge atoms.
+          const bridgeLocants=bridge=>[baseLocants.get(bridge[0]),baseLocants.get(bridge.at(-1))].sort((a,b)=>a-b);
+          const citedBridges=secondary.slice().sort((left,right)=>{
+            const difference=(right.length-2)-(left.length-2);if(difference)return difference;
+            return compareVectors(bridgeLocants(left),bridgeLocants(right));
+          });
+          const numberedBridges=secondary.slice().sort((left,right)=>{
+            const leftLocants=bridgeLocants(left),rightLocants=bridgeLocants(right);
+            return rightLocants[1]-leftLocants[1]||(right.length-left.length)||leftLocants[0]-rightLocants[0];
+          });
+          const bridgeDescriptors=citedBridges.map(bridge=>({length:bridge.length-2,locants:bridgeLocants(bridge)})),order=baseOrder.slice();let numberingValid=true;
+          for(const bridge of numberedBridges){
+            const locants=bridgeLocants(bridge);if(locants.some(loc=>!loc)){numberingValid=false;break;}
+            const length=bridge.length-2;
+            if(length){const oriented=baseLocants.get(bridge[0])>baseLocants.get(bridge.at(-1))?bridge:bridge.slice().reverse();order.push(...oriented.slice(1,-1));}
+          }
+          if(!numberingValid||order.length!==core.size||new Set(order).size!==core.size)continue;
+          const positions=new Map(order.map((atom,index)=>[atom,index+1])),groups=new Map(),coverage=createIUPACCoverageLedger(atoms,edges,adj),accounted=new Set(core);let valid=true;
+          for(const atom of core)if(!coverage.markAtom(atom))valid=false;
+          for(const edge of coreEdges)if(!coverage.markBond(edge.a,edge.b))valid=false;
+          for(const atom of core)for(const edge of adj[atom])if(!core.has(edge.i)&&atoms[edge.i].el!=='H'){
+            const label=branchLabel(atom,edge,core);if(!label){valid=false;break;}
+            if(!groups.has(label))groups.set(label,[]);groups.get(label).push(positions.get(atom));
+            const fragment=new Set(collectConnectedAtoms(edge.i,core,adj,atoms));
+            if(!coverage.markAttachedFragment(fragment,core,atom,edge.i)){valid=false;break;}
+            for(const index of fragment)accounted.add(index);
+          }
+          if(!valid||heavy.some(atom=>!accounted.has(atom))||!coverage.complete())continue;
+          const heteroByElement=new Map(HANTZSCH_ELEMENTS.map(element=>[element,order.map((atom,index)=>atoms[atom].el===element?index+1:null).filter(Number.isInteger)]));
+          const allHeteroLocants=HANTZSCH_ELEMENTS.flatMap(element=>heteroByElement.get(element)).sort((a,b)=>a-b),perElementLocants=HANTZSCH_ELEMENTS.flatMap(element=>heteroByElement.get(element));
+          const ringLengths=routes.map(route=>route.length-2).sort((a,b)=>b-a),mainLength=mainBridge.length-2,secondaryLengths=bridgeDescriptors.map(item=>item.length);
+          const structuralScore=[-cycle.path.length,-mainLength,Math.abs(ringLengths[0]-ringLengths[1]),...secondaryLengths.map(length=>-length)];
+          const substituentLocants=[...groups.values()].flat().sort((a,b)=>a-b),alpha=[...groups.keys()].sort(comparePrefixNames).map(prefixAlphaKey).join('|');
+          const bridgeLocantSet=bridgeDescriptors.flatMap(item=>item.locants).sort((a,b)=>a-b),bridgeLocantSequence=bridgeDescriptors.flatMap(item=>item.locants);
+          const descriptorScore=[...bridgeLocantSet,99,...bridgeLocantSequence,99,...allHeteroLocants,99,...perElementLocants,99,...substituentLocants];
+          const groupPrefix=[...groups].sort((left,right)=>comparePrefixNames(left[0],right[0])).map(([name,locants])=>locants.sort((a,b)=>a-b).join(',')+'-'+(locants.length>1?(IUPAC_MULTIPLIERS[locants.length]||''):'')+name);
+          const stereo=[];
+          if(stereocenters.length){
+            try{for(const atom of stereocenters){const kind=cipTetraDescriptor(cipGraphContext(cipGraph),atom);if(!kind){valid=false;break;}stereo.push({loc:positions.get(atom),kind});}}catch(error){valid=false;}
+          }
+          if(!valid)continue;
+          candidates.push({structuralScore,descriptorScore,alpha,order,heteroByElement,bridgeDescriptors,mainLengths:ringLengths.concat(mainLength).sort((a,b)=>b-a),groupPrefix,stereo});
+        }
       }
-      if(!valid||heavy.some(atomIndex=>!accounted.has(atomIndex))||!coverage.complete())continue;
-      const score=[...groups.values()].flat().sort((x,y)=>x-y),alphabetic=[...groups.keys()].sort(comparePrefixNames).map(prefixAlphaKey).join('|');
-      const stereocenters=core.size?order.filter(atomIndex=>atoms[atomIndex].stereo):[];
-      if(heavy.some(atomIndex=>atoms[atomIndex].stereo&&!core.has(atomIndex)))continue;
-      let stereo=[];
-      if(stereocenters.length){
-        const cipGraph={atoms,bonds:edges.map(e=>({a:e.a,b:e.c,o:e.o,dir:e.dir,dirFrom:e.dirFrom}))};
-        try{stereo=stereocenters.map(atomIndex=>({loc:order.indexOf(atomIndex)+1,kind:cipTetraDescriptor(cipGraphContext(cipGraph),atomIndex)}));}catch(error){continue;}
-        if(stereo.some(item=>!item.kind))continue;
-      }
-      assignments.push({groups,score,alphabetic,order,stereo});
     }
   }
-  if(!assignments.length)return null;
-  assignments.sort((x,y)=>compareNumberingScores(x.score,y.score)||x.alphabetic.localeCompare(y.alphabetic,'pt'));
-  const chosen=assignments[0],multipliers={2:'di',3:'tri',4:'tetra',5:'penta',6:'hexa'},groups=chosen.groups;
-  const prefix=[...groups].sort((x,y)=>comparePrefixNames(x[0],y[0])).map(([name,locants])=>locants.sort((a,b)=>a-b).join(',')+'-'+(multipliers[locants.length]||'')+name).join('-');
-  const stereo=chosen.stereo.length?'('+chosen.stereo.sort((x,y)=>x.loc-y.loc).map(x=>x.loc+x.kind).join(',')+')-':'';
-  return stereo+prefix+'biciclo['+lengths.join('.')+']'+stem+'ano';
+  if(!candidates.length)return null;
+  candidates.sort((left,right)=>compareVectors(left.structuralScore,right.structuralScore)||compareVectors(left.descriptorScore,right.descriptorScore)||left.alpha.localeCompare(right.alpha,'pt'));
+  const chosen=candidates[0],stem=IUPAC_STEMS[core.size];if(!stem)return null;
+  const replacement=HANTZSCH_ELEMENTS.filter(element=>chosen.heteroByElement.get(element).length).map(element=>{
+    const locants=chosen.heteroByElement.get(element),multiplier=locants.length>1?IUPAC_MULTIPLIERS[locants.length]:'';
+    if(locants.length>1&&!multiplier)return null;
+    return locants.join(',')+'-'+(multiplier||'')+HANTZSCH_PREFIXES[element];
+  });
+  if(replacement.some(part=>!part))return null;
+  const secondary=chosen.bridgeDescriptors.map(item=>item.length+'^'+item.locants.join(','));
+  const descriptor=[...chosen.mainLengths,...secondary].join('.');
+  const prefix=[...chosen.groupPrefix,...replacement].join('-');
+  const stereo=chosen.stereo.length?'('+chosen.stereo.sort((a,b)=>a.loc-b.loc).map(item=>item.loc+item.kind).join(',')+')-':'';
+  return stereo+prefix+rankNames[cycleRank]+'['+descriptor+']'+stem+'ano';
 }
 function nameSimpleHeterocycle(atoms,adj,heavy,edges){
   const degree=atoms.map((_,i)=>adj[i].filter(e=>atoms[e.i].el!=='H').length),alive=new Set(heavy),queue=heavy.filter(i=>degree[i]<=1);
   for(let p=0;p<queue.length;p++){const u=queue[p];if(!alive.delete(u))continue;for(const e of adj[u])if(alive.has(e.i)&&--degree[e.i]===1)queue.push(e.i);}
-  const ring=[...alive];if(ring.length<3||ring.length>6)return null;
+  const ring=[...alive];if(ring.length<3)return null;
   const ringSet=new Set(ring),ringEdges=ring.reduce((n,i)=>n+adj[i].filter(e=>ringSet.has(e.i)).length,0)/2;
   if(ringEdges!==ring.length||ring.some(i=>adj[i].filter(e=>ringSet.has(e.i)).length!==2))return null;
-  const hetero=ring.filter(i=>['O','N','S'].includes(atoms[i].el));if(hetero.length!==1||ring.some(i=>!['C','O','N','S'].includes(atoms[i].el)))return null;
-  const parent=HETEROCYCLE_PARENTS[atoms[hetero[0]].el+':'+ring.length];if(!parent)return null;
+  const hetero=ring.filter(i=>['O','N','S'].includes(atoms[i].el));if(!hetero.length||ring.some(i=>!['C','O','N','S'].includes(atoms[i].el)))return null;
+  const polyheterocycle=hetero.length>1;
+  if(polyheterocycle&&ring.length>10)return null;
+  const parent=polyheterocycle?null:heterocycleParent(atoms[hetero[0]].el,ring.length);if(!polyheterocycle&&!parent)return null;
   const carbonyls=ring.filter(c=>adj[c].some(e=>atoms[e.i].el==='O'&&e.o>=1.75&&adj[e.i].filter(x=>atoms[x.i].el!=='H').length===1));
-  if(carbonyls.length>3||heavy.some(i=>(atoms[i].q||0)!==0)||ring.some(i=>adj[i].some(e=>ringSet.has(e.i)&&e.o!==1))||heavy.some(i=>atoms[i].stereo&&!ringSet.has(i)))return null;
+  if(carbonyls.length>3||polyheterocycle&&carbonyls.length||heavy.some(i=>(atoms[i].q||0)!==0)||ring.some(i=>adj[i].some(e=>ringSet.has(e.i)&&e.o!==1))||heavy.some(i=>atoms[i].stereo&&!ringSet.has(i)))return null;
   const routes=[];
-  for(const first of adj[hetero[0]].filter(e=>ringSet.has(e.i))){
-    const order=[hetero[0]];let prev=hetero[0],cur=first.i;
-    while(cur!==hetero[0]&&order.length<ring.length){order.push(cur);const next=adj[cur].find(e=>ringSet.has(e.i)&&e.i!==prev);if(!next)break;prev=cur;cur=next.i;}
-    if(order.length===ring.length&&cur===hetero[0])routes.push(order);
+  const seniority={O:0,S:1,N:2},seniorHetero=hetero.reduce((best,index)=>seniority[atoms[index].el]<seniority[atoms[best].el]?index:best,hetero[0]);
+  const preferredStarts=hetero.filter(i=>atoms[i].el===atoms[seniorHetero].el);
+  for(const start of preferredStarts)for(const first of adj[start].filter(e=>ringSet.has(e.i))){
+    const order=[start];let prev=start,cur=first.i;
+    while(cur!==start&&order.length<ring.length){order.push(cur);const next=adj[cur].find(e=>ringSet.has(e.i)&&e.i!==prev);if(!next)break;prev=cur;cur=next.i;}
+    if(order.length===ring.length&&cur===start)routes.push(order);
   }
-  if(routes.length!==2)return null;
+  if(routes.length<2)return null;
   const candidates=[];
   for(const order of routes){
-    const coverage=createIUPACCoverageLedger(atoms,edges,adj),groups=new Map(),accounted=new Set(),carbonylLocants=carbonyls.map(carbonyl=>order.indexOf(carbonyl)+1).sort((a,b)=>a-b);let valid=true;
+    const coverage=createIUPACCoverageLedger(atoms,edges,adj),groups=new Map(),accounted=new Set(),carbonylLocants=carbonyls.map(carbonyl=>order.indexOf(carbonyl)+1).sort((a,b)=>a-b),heteroByElement=new Map(HANTZSCH_ELEMENTS.map(element=>[element,order.map((atom,loc)=>atoms[atom].el===element?loc+1:null).filter(Number.isInteger)])),heteroLocants=HANTZSCH_ELEMENTS.flatMap(element=>heteroByElement.get(element)),allHeteroLocants=heteroLocants.slice().sort((a,b)=>a-b);let valid=true;
     for(const atomIndex of order)if(!coverage.markAtom(atomIndex))valid=false;
     for(let p=0;p<order.length;p++)if(!coverage.markBond(order[p],order[(p+1)%order.length]))valid=false;
     for(let loc=0;loc<order.length&&valid;loc++)for(const edge of adj[order[loc]])if(!ringSet.has(edge.i)&&atoms[edge.i].el!=='H'){
       const atom=atoms[edge.i];let label=null;
       if(carbonyls.includes(order[loc])&&atom.el==='O'&&edge.o>=1.75){label='__carbonyl';accounted.add(edge.i);if(!coverage.markAtom(edge.i)||!coverage.markBond(order[loc],edge.i)){valid=false;break;}}
       else if(atom.el==='C'&&edge.o===1)label=describeAlkyl(edge.i,ringSet,adj,atoms);
+      else if(atom.el==='C'&&edge.o===2)label=describeAlkylidene(edge.i,order[loc],ringSet,adj,atoms);
       else if(atom.el==='O'&&edge.o===1){
         const other=adj[edge.i].filter(x=>x.i!==order[loc]&&atoms[x.i].el!=='H');
         if(!other.length)label='hidroxi';
@@ -6082,23 +6412,27 @@ function nameSimpleHeterocycle(atoms,adj,heavy,edges){
     }
     if(!valid)continue;
     if(heavy.some(i=>!ringSet.has(i)&&!accounted.has(i))||!coverage.complete())continue;
-    const locants=[...groups.values()].flat().sort((a,b)=>a-b),score=[...carbonylLocants,99,...locants];
+    const locants=[...groups.values()].flat().sort((a,b)=>a-b),score=[...allHeteroLocants,99,...heteroLocants,99,...carbonylLocants,99,...locants];
     const stereocenters=order.filter(i=>atoms[i].stereo),stereo=[];
     if(stereocenters.length){
       const cipGraph={atoms,bonds:edges.map(e=>({a:e.a,b:e.c,o:e.o,dir:e.dir,dirFrom:e.dirFrom}))};
       try{for(const i of stereocenters)stereo.push({loc:order.indexOf(i)+1,kind:cipTetraDescriptor(cipGraphContext(cipGraph),i)});}catch(error){continue;}
       if(stereo.some(item=>!item.kind))continue;
     }
-    candidates.push({groups,carbonylLocants,score,stereo});
+    candidates.push({groups,carbonylLocants,heteroLocants,score,stereo,order});
   }
   if(!candidates.length)return null;
   candidates.sort((a,b)=>compareNumberingScores(a.score,b.score));
-  const chosen=candidates[0],multipliers={2:'di',3:'tri',4:'tetra',5:'penta',6:'hexa'};
+  const chosen=candidates[0],multipliers=IUPAC_MULTIPLIERS;
   const prefix=[...chosen.groups].sort((a,b)=>comparePrefixNames(a[0],b[0])).map(([label,locants])=>locants.sort((a,b)=>a-b).join(',')+'-'+(multipliers[locants.length]||'')+label).join('-');
   const carbonylSuffix={1:'ona',2:'diona',3:'triona'}[chosen.carbonylLocants.length]||null;if(chosen.carbonylLocants.length&&!carbonylSuffix)return null;
-  const parentName=chosen.carbonylLocants.length?parent.name+'-'+chosen.carbonylLocants.join(',')+'-'+carbonylSuffix:parent.hydride;
+  let parentName;
+  if(polyheterocycle){
+    const byElement=new Map(HANTZSCH_ELEMENTS.map(element=>[element,chosen.order.map((atom,loc)=>atoms[atom].el===element?loc+1:null).filter(Number.isInteger)]));
+    parentName=hantzschHydrideName(ring.length,byElement);if(!parentName)return null;
+  }else parentName=chosen.carbonylLocants.length?parent.name+'-'+chosen.carbonylLocants.join(',')+'-'+carbonylSuffix:parent.hydride;
   const stereo=chosen.stereo.length?'('+chosen.stereo.sort((a,b)=>a.loc-b.loc).map(item=>item.loc+item.kind).join(',')+')-':'';
-  return stereo+prefix+parentName;
+  return stereo+prefix+(prefix&&polyheterocycle?'-':'')+parentName;
 }
 function hasCyclicAmideOrLactone(atoms,adj){
   for(const carbon of atoms.map((a,i)=>a.el==='C'?i:-1).filter(i=>i>=0)){
@@ -6121,8 +6455,9 @@ function nameStructureIUPACCandidate(input=mol){
   if(heavy.some(i=>atoms[i]._valenceWarning))return null;
   const seen=new Set([heavy[0]]),q=[heavy[0]];for(let h=0;h<q.length;h++)for(const e of adj[q[h]])if(atoms[e.i].el!=='H'&&!seen.has(e.i)){seen.add(e.i);q.push(e.i);}if(seen.size!==heavy.length)return null;
   const anhydrideName=nameSimpleAcidAnhydride(input);if(anhydrideName)return anhydrideName;
-  const polyetherName=nameSimpleAcyclicPolyether(input,atoms,adj,heavy);if(polyetherName)return polyetherName;
+  const skeletalReplacementName=nameSimpleAcyclicReplacement(input,atoms,adj,heavy);if(skeletalReplacementName)return skeletalReplacementName;
   const heterocycleName=nameSimpleHeterocycle(atoms,adj,heavy,edges);if(heterocycleName)return heterocycleName;
+  const cyclicReplacementName=nameSimpleCyclicReplacement(input,atoms,adj,heavy);if(cyclicReplacementName)return cyclicReplacementName;
   if(hasCyclicAmideOrLactone(atoms,adj))return null;
   const simpleNAmine=nameSimpleNAlkylAmine(atoms,adj,heavy);if(simpleNAmine)return simpleNAmine;
   const coverage=createIUPACCoverageLedger(atoms,edges,adj);
@@ -6176,9 +6511,15 @@ function nameStructureIUPACCandidate(input=mol){
     for(const e of edges)if(cset.has(e.a)&&cset.has(e.c)){cadj.get(e.a).push({i:e.c,o:e.o});cadj.get(e.c).push({i:e.a,o:e.o});cedges.push(e);}
   }
   const oh=[];for(const i of heavy)if(atoms[i].el==='O'&&adj[i].some(e=>atoms[e.i].el==='C'&&e.o===1)&&adj[i].filter(e=>atoms[e.i].el!=='H').length===1)oh.push(adj[i].find(e=>atoms[e.i].el==='C').i);
+  const cyclicAtoms=new Set(heavy),skeletalDegree=new Map(heavy.map(i=>[i,adj[i].filter(edge=>atoms[edge.i].el!=='H').length])),acyclicLeaves=heavy.filter(i=>skeletalDegree.get(i)<=1);
+  for(let p=0;p<acyclicLeaves.length;p++){
+    const atom=acyclicLeaves[p];if(!cyclicAtoms.delete(atom))continue;
+    for(const edge of adj[atom])if(cyclicAtoms.has(edge.i)){const next=skeletalDegree.get(edge.i)-1;skeletalDegree.set(edge.i,next);if(next===1)acyclicLeaves.push(edge.i);}
+  }
   const amideNitrogens=new Set(dblOs.filter(group=>group.isAmide).flatMap(group=>group.nSingle));
   const amineGroups=[];
   for(const nitrogen of heavy)if(atoms[nitrogen].el==='N'&&(atoms[nitrogen].q||0)===0){
+    if(cyclicAtoms.has(nitrogen))continue;
     const neighbors=adj[nitrogen].filter(e=>atoms[e.i].el!=='H');
     if(neighbors.length<1||neighbors.length>3||neighbors.some(e=>atoms[e.i].el!=='C'||e.o!==1)||amideNitrogens.has(nitrogen)||nitrileNs.some(x=>x.ns.includes(nitrogen)))continue;
     amineGroups.push({nitrogen,roots:neighbors.map(e=>e.i)});
@@ -6214,10 +6555,28 @@ function nameStructureIUPACCandidate(input=mol){
     aldehyde:aldehydes.map(x=>x.c),ketone:ketones.map(x=>x.c),alcohol:oh,thiol:thiolGroups.map(x=>x.center),amine:amines,imine:imineGroups.map(x=>x.c)
   };
   for(const group of IUPAC_FUNCTIONAL_GROUP_SENIORITY){if(functionalGroupCandidates[group].length){kind=group;centers=functionalGroupCandidates[group].slice();break;}}
-  if((kind==='acid'&&centers.length>1)||(kind==='ester'&&centers.length>1)||(kind==='amide'&&centers.length>1)||(kind==='nitrile'&&centers.length>1)||(kind==='aldehyde'&&centers.length>1))return null;
-  if((kind==='ketone'&&centers.length>4)||(kind==='alcohol'&&centers.length>5)||(kind==='amine'&&centers.length>4))return null;
-  if(kind==='phosphonicAcid'&&centers.length>3)return null;
-  if(!kind){const bicyclo=nameSimpleBicycloHydrocarbon(atoms,adj,edges,heavy);if(bicyclo)return bicyclo;}
+  let polycarboxyGroups=[],polyAldehydeGroups=[];
+  if(kind==='acid'&&centers.length>2){
+    const acidCenters=new Set(centers);
+    polycarboxyGroups=acids.filter(group=>acidCenters.has(group.c)).map(group=>{
+      const attachment=adj[group.c].find(edge=>edge.o===1&&atoms[edge.i].el==='C');
+      return attachment?{...group,attachment:attachment.i}:null;
+    });
+    if(polycarboxyGroups.length!==centers.length||polycarboxyGroups.some(group=>!group||acidCenters.has(group.attachment)))return null;
+    centers=polycarboxyGroups.map(group=>group.attachment);kind='polyacid';
+  }
+  if(kind==='aldehyde'&&centers.length>2){
+    const aldehydeCenters=new Set(centers);
+    polyAldehydeGroups=aldehydes.filter(group=>aldehydeCenters.has(group.c)).map(group=>{
+      const attachment=adj[group.c].find(edge=>edge.o===1&&atoms[edge.i].el==='C');
+      return attachment?{...group,attachment:attachment.i}:null;
+    });
+    if(polyAldehydeGroups.length!==centers.length||polyAldehydeGroups.some(group=>!group||aldehydeCenters.has(group.attachment)))return null;
+    centers=polyAldehydeGroups.map(group=>group.attachment);kind='polyAldehyde';
+  }
+  if((kind==='acid'&&centers.length>2)||(kind==='ester'&&centers.length>1))return null;
+  if(kind&&centers.length>IUPAC_MAX_MULTIPLIER_COUNT)return null;
+  if(!kind){const vonBaeyer=nameSimpleVonBaeyerSystem(atoms,adj,edges,heavy);if(vonBaeyer)return vonBaeyer;}
   const etherAuxCarbons=new Set();
   if(linkerLinks.length){
     let parentComponent=null;
@@ -6234,9 +6593,10 @@ function nameStructureIUPACCandidate(input=mol){
       if(side)for(const atomIndex of side)etherAuxCarbons.add(atomIndex);
     }
   }
-  const auxiliaryCarbons=new Set([...esterAuxCarbons,...etherAuxCarbons]),secondaryAmideCarbonyls=new Set();
+  const auxiliaryCarbons=new Set([...esterAuxCarbons,...etherAuxCarbons,...polycarboxyGroups.map(group=>group.c),...polyAldehydeGroups.map(group=>group.c)]),secondaryAmideCarbonyls=new Set();
   const aminePriority=IUPAC_FUNCTIONAL_GROUP_SENIORITY.indexOf('amine');
-  if(kind&&centers.length&&IUPAC_FUNCTIONAL_GROUP_SENIORITY.indexOf(kind)<aminePriority){
+  const principalPriority=kind==='polyAldehyde'?'aldehyde':kind;
+  if(kind&&centers.length&&IUPAC_FUNCTIONAL_GROUP_SENIORITY.indexOf(principalPriority)<aminePriority){
     const{componentOf}=carbonSkeletonComponents(cs,adj,atoms),principalComponents=new Set(centers.map(center=>componentOf.get(center)));
     if(principalComponents.size===1&&!principalComponents.has(undefined)){
       const principalComponent=principalComponents.values().next().value;
@@ -6280,7 +6640,7 @@ function nameStructureIUPACCandidate(input=mol){
   }
   let parentPath=null,isCycle=false,sideRingCore=null,sideRingAromatic=false;
   const principalAttachedToRing=centers.length>0&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)));
-  const ringIsPrincipal=ring&&(!centers.length||centers.every(c=>ringCore.includes(c))||principalAttachedToRing&&aromatic&&['acid','aldehyde','amide'].includes(kind));
+  const ringIsPrincipal=ring&&(!centers.length||centers.every(c=>ringCore.includes(c))||principalAttachedToRing&&['acid','aldehyde','amide'].includes(kind));
   if(ringIsPrincipal){
     isCycle=true;const start=ringCore[0],neighbors=cadj.get(start).filter(e=>ringCore.includes(e.i));
     let cycle=[start],prev=start,cur=neighbors[0].i;
@@ -6297,32 +6657,53 @@ function nameStructureIUPACCandidate(input=mol){
       const start=leaves[i],end=leaves[j],prev=new Map([[start,-1]]),todo=[start];
       for(let h=0;h<todo.length;h++){const u=todo[h];if(u===end)break;for(const e of pathAdj.get(u))if(!prev.has(e.i)){prev.set(e.i,u);todo.push(e.i);}}
       if(!prev.has(end))continue;let path=[],u=end;while(u!==-1){path.push(u);u=prev.get(u);}path.reverse();
-      if(centers.length&&!centers.every(c=>path.includes(c)))continue;
       candidates.push(path);
     }
     if(!candidates.length)return null;
     function pathUnsaturation(path){let multiple=0,doubles=0;for(let k=0;k<path.length-1;k++){const e=cadj.get(path[k]).find(x=>x.i===path[k+1]);if(e&&e.o>1){multiple++;if(e.o<2.75)doubles++;}}return{multiple,doubles};}
-    function pathPrefixCount(path){
-      const inside=new Set(path);let count=0;
-      for(const c of path)for(const e of adj[c])if(atoms[e.i].el!=='H'&&!inside.has(e.i)){
-        const label=externalLabel(c,e,path);if(label&&isDetachablePrefix(c,label))count++;
-      }
-      return count;
-    }
     function compareScores(a,b){for(let i=0;i<Math.max(a.length,b.length);i++){const d=(a[i]??999)-(b[i]??999);if(d)return d;}return 0;}
     function bestPathScore(path){const forward=orientationScore(path),reverse=orientationScore(path.slice().reverse());return compareScores(forward,reverse)<=0?forward:reverse;}
-    candidates.sort((a,b)=>{const x=pathUnsaturation(a),y=pathUnsaturation(b);return b.length-a.length||y.multiple-x.multiple||y.doubles-x.doubles||pathPrefixCount(b)-pathPrefixCount(a)||compareScores(bestPathScore(a),bestPathScore(b));});parentPath=candidates[0];
+    function orientationPriorityScore(path){
+      const suffix=centers.filter(center=>path.includes(center)).map(center=>path.indexOf(center)+1).sort((a,b)=>a-b),multiple=[],doubles=[];
+      if(!aromatic){for(let k=0;k<path.length-1;k++){const edge=cadj.get(path[k]).find(item=>item.i===path[k+1]);if(edge&&edge.o>1){multiple.push(k+1);if(edge.o<2.75)doubles.push(k+1);}}}
+      return[...suffix,99,...multiple,99,...doubles];
+    }
+    function bestPriorityScore(path){const forward=orientationPriorityScore(path),reverse=orientationPriorityScore(path.slice().reverse());return compareScores(forward,reverse)<=0?forward:reverse;}
+    // Blue Book order: principal groups, chain length, unsaturation count/type, then locants.
+    candidates.sort((a,b)=>{
+      const principalGroupsA=centers.filter(center=>a.includes(center)).length,principalGroupsB=centers.filter(center=>b.includes(center)).length;
+      if(principalGroupsA!==principalGroupsB)return principalGroupsB-principalGroupsA;
+      const x=pathUnsaturation(a),y=pathUnsaturation(b);
+      return b.length-a.length||y.multiple-x.multiple||y.doubles-x.doubles||compareScores(bestPriorityScore(a),bestPriorityScore(b))||compareScores(bestPathScore(a),bestPathScore(b));
+    });parentPath=candidates[0];
   }
   let ringAcidCenter=null;
   if(centers.some(c=>!parentPath.includes(c))){
-    if(isCycle&&centers.length===1&&kind==='acid'&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)))){
+    if(isCycle&&centers.length>1&&kind==='acid'&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)))){
+      const acidCenters=new Set(centers);
+      polycarboxyGroups=acids.filter(group=>acidCenters.has(group.c)).map(group=>{
+        const attachment=adj[group.c].find(edge=>edge.o===1&&ringCore.includes(edge.i));
+        return attachment?{...group,attachment:attachment.i}:null;
+      });
+      if(polycarboxyGroups.length!==centers.length||polycarboxyGroups.some(group=>!group))return null;
+      centers=polycarboxyGroups.map(group=>group.attachment);kind='polyacid';
+    }else if(isCycle&&centers.length===1&&kind==='acid'&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)))){
       ringAcidCenter=centers[0];const attach=adj[centers[0]].find(e=>ringCore.includes(e.i)).i;kind='ringacid';centers=[attach];
-    }else if(isCycle&&aromatic&&centers.length===1&&kind==='aldehyde'&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)))){
+    }else if(isCycle&&centers.length>1&&kind==='aldehyde'&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)))){
+      const aldehydeCenters=new Set(centers);
+      polyAldehydeGroups=aldehydes.filter(group=>aldehydeCenters.has(group.c)).map(group=>{
+        const attachment=adj[group.c].find(edge=>edge.o===1&&ringCore.includes(edge.i));
+        return attachment?{...group,attachment:attachment.i}:null;
+      });
+      if(polyAldehydeGroups.length!==centers.length||polyAldehydeGroups.some(group=>!group))return null;
+      centers=polyAldehydeGroups.map(group=>group.attachment);kind='polyAldehyde';
+    }else if(isCycle&&centers.length===1&&kind==='aldehyde'&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)))){
       ringAcidCenter=centers[0];const attach=adj[centers[0]].find(e=>ringCore.includes(e.i)).i;kind='ringaldehyde';centers=[attach];
-    }else if(isCycle&&aromatic&&centers.length===1&&kind==='amide'&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)))){
+    }else if(isCycle&&centers.length===1&&kind==='amide'&&centers.every(c=>adj[c].some(e=>ringCore.includes(e.i)))){
       ringAcidCenter=centers[0];const attach=adj[centers[0]].find(e=>ringCore.includes(e.i)).i;kind='ringamide';centers=[attach];
     }else return null;
   }
+  if(kind==='acid'&&centers.length===2&&(!centers.includes(parentPath[0])||!centers.includes(parentPath[parentPath.length-1])))return null;
   if(parentPath.length>20)return null;
   function describeArylGroup(root,path){
     if(!sideRingCore||!sideRingAromatic||sideRingCore.length!==6||!sideRingCore.includes(root)||sideRingCore.some(i=>atoms[i].el!=='C'))return null;
@@ -6348,7 +6729,7 @@ function nameStructureIUPACCandidate(input=mol){
   }
   function externalLabel(c,e,path){
     const atom=atoms[e.i],el=atom.el;
-    if(el==='C')return e.o===1?(sideRingCore&&sideRingCore.includes(e.i)?describeArylGroup(e.i,path):describeAlkyl(e.i,new Set(path),adj,atoms)):null;
+    if(el==='C')return e.o===1?(sideRingCore&&sideRingCore.includes(e.i)?describeArylGroup(e.i,path):describeAlkyl(e.i,new Set(path),adj,atoms)):e.o===2?describeAlkylidene(e.i,c,new Set(path),adj,atoms):null;
     if(el==='O'){
       if(e.o===2)return'oxo';if(e.o!==1)return null;
       const other=adj[e.i].filter(x=>x.i!==c&&atoms[x.i].el!=='H');if(!other.length)return'hidroxi';
@@ -6404,17 +6785,17 @@ function nameStructureIUPACCandidate(input=mol){
   }
   function isDetachablePrefix(c,label){
     if(!centers.includes(c))return true;
-    if(label==='oxo'&&['acid','amide','aldehyde','ketone'].includes(kind))return false;
+    if(label==='oxo'&&['acid','amide','aldehyde','polyAldehyde','ketone'].includes(kind))return false;
     if(label==='hidroxi'&&['acid','alcohol'].includes(kind))return false;
     if(label==='amino'&&['amide','amine'].includes(kind))return false;
     return true;
   }
   function orientationScore(path){
-    const suffix=centers.map(i=>path.indexOf(i)+1||99).sort((a,b)=>a-b),uns=[];if(!aromatic){for(let k=0;k<path.length-1;k++){const e=cadj.get(path[k]).find(x=>x.i===path[k+1]);if(e&&e.o>1)uns.push(k+1);}if(isCycle){const e=cadj.get(path[path.length-1]).find(x=>x.i===path[0]);if(e&&e.o>1)uns.push(path.length);}}
+    const suffix=centers.filter(i=>path.includes(i)).map(i=>path.indexOf(i)+1).sort((a,b)=>a-b),uns=[],doubleUns=[];if(!aromatic){for(let k=0;k<path.length-1;k++){const e=cadj.get(path[k]).find(x=>x.i===path[k+1]);if(e&&e.o>1){uns.push(k+1);if(e.o<2.75)doubleUns.push(k+1);}}if(isCycle){const e=cadj.get(path[path.length-1]).find(x=>x.i===path[0]);if(e&&e.o>1){uns.push(path.length);if(e.o<2.75)doubleUns.push(path.length);}}}
     const groups=new Map();for(let k=0;k<path.length;k++)for(const e of adj[path[k]])if(atoms[e.i].el!=='H'&&!path.includes(e.i)){const label=externalLabel(path[k],e,path);if(label&&isDetachablePrefix(path[k],label)){if(!groups.has(label))groups.set(label,[]);groups.get(label).push(k+1);}}
     const names=[...groups.keys()].sort(comparePrefixNames),allLocants=[...groups.values()].flat().sort((a,b)=>a-b);
     const firstPrefix=names.length?groups.get(names[0]).sort((a,b)=>a-b):[];
-    return[...suffix,99,...uns,99,...allLocants,99,...firstPrefix];
+    return[...suffix,99,...uns,99,...doubleUns,99,...allLocants,99,...firstPrefix];
   }
   const candidates=[];
   if(isCycle){for(let k=0;k<parentPath.length;k++)for(const dir of [1,-1])candidates.push(Array.from({length:parentPath.length},(_,j)=>parentPath[(k+dir*j+parentPath.length*2)%parentPath.length]));}
@@ -6454,7 +6835,6 @@ function nameStructureIUPACCandidate(input=mol){
   };
   const doubleLoc=[],tripleLoc=[];for(let k=0;k<parentPath.length-1;k++){const e=cadj.get(parentPath[k]).find(x=>x.i===parentPath[k+1]);if(e&&e.o>=2.75)tripleLoc.push(k+1);else if(e&&e.o>=1.75)doubleLoc.push(k+1);}
   if(isCycle){const e=cadj.get(parentPath[parentPath.length-1]).find(x=>x.i===parentPath[0]);if(e){if(e.o>=2.75)tripleLoc.push(parentPath.length);else if(e.o>=1.75)doubleLoc.push(parentPath.length);}}
-  if(doubleLoc.length&&tripleLoc.length)return null;
   if(dblOs.some(d=>!d.isAcid&&!d.isEster&&!d.isAmide&&!d.isAldehyde&&!d.isKetone&&!d.isAcidHalide))return null;
   const consumed=new Set(),namedAtoms=new Set(parentPath),namedNitroAtoms=new Set(),parentSet=new Set(parentPath),nSubstituents=kind==='amine'&&principalAmine?principalAmine.nSubstituents.slice():kind==='imine'&&principalImine?[principalImine.name]:[];
   const markNamed=i=>{consumed.add(i);namedAtoms.add(i);};
@@ -6467,6 +6847,8 @@ function nameStructureIUPACCandidate(input=mol){
   };
   const principalCarbonyls=new Set();
   if(['acid','ester','amide','aldehyde','ketone','acidHalide'].includes(kind))for(const c of centers)principalCarbonyls.add(c);
+  if(kind==='polyacid')for(const group of polycarboxyGroups)principalCarbonyls.add(group.c);
+  if(kind==='polyAldehyde')for(const group of polyAldehydeGroups)principalCarbonyls.add(group.c);
   if((kind==='ringacid'||kind==='ringaldehyde'||kind==='ringamide')&&ringAcidCenter!==null)principalCarbonyls.add(ringAcidCenter);
   if(dblOs.some(d=>(d.isAcid||d.isEster||d.isAmide&&!secondaryAmideCarbonyls.has(d.c)||d.isAcidHalide)&&!principalCarbonyls.has(d.c)))return null;
   for(const d of dblOs)if(principalCarbonyls.has(d.c)){
@@ -6520,7 +6902,7 @@ function nameStructureIUPACCandidate(input=mol){
     if(heavy.some(i=>!namedAtoms.has(i)||((atoms[i].q||0)!==0&&!namedNitroAtoms.has(i)))||!coverage.complete())return null;
     const halideName=kind==='acidHalide'?({'F':'fluoreto','Cl':'cloreto','Br':'brometo','I':'iodeto'}[atoms[acidHalides.find(group=>centers.includes(group.c))?.halides[0]]?.el]||''):'';
     const ringName=renderName(substituents,'benzen',kind,suffixLocs,doubleLoc,tripleLoc,true,true,parentPath.length,esterAlkylName,nSubstituents,halideName);if(!ringName)return null;
-    return(kind==='acid'||kind==='ringacid'||kind==='sulfonicAcid'||kind==='sulfinicAcid'||kind==='phosphonicAcid'?'ácido ':'')+addStereoDescriptors(ringName);
+    return(kind==='acid'||kind==='polyacid'||kind==='ringacid'||kind==='sulfonicAcid'||kind==='sulfinicAcid'||kind==='phosphonicAcid'?'ácido ':'')+addStereoDescriptors(ringName);
   }
   const substituents=[];
   for(let k=0;k<parentPath.length;k++){const c=parentPath[k];for(const e of adj[c])if(atoms[e.i].el!=='H'&&!parentPath.includes(e.i)&&!consumed.has(e.i)){
@@ -6536,7 +6918,7 @@ function nameStructureIUPACCandidate(input=mol){
   if(!base)return null;
   const halideName=kind==='acidHalide'?({'F':'fluoreto','Cl':'cloreto','Br':'brometo','I':'iodeto'}[atoms[acidHalides.find(group=>centers.includes(group.c))?.halides[0]]?.el]||''):'';
   const name=renderName(substituents,base,kind,suffixLocs,doubleLoc,tripleLoc,isCycle,aromatic,parentPath.length,esterAlkylName,nSubstituents,halideName);if(!name)return null;
-  return(kind==='acid'||kind==='ringacid'||kind==='sulfonicAcid'||kind==='sulfinicAcid'||kind==='phosphonicAcid'?'ácido ':'')+addStereoDescriptors(name);
+  return(kind==='acid'||kind==='polyacid'||kind==='ringacid'||kind==='sulfonicAcid'||kind==='sulfinicAcid'||kind==='phosphonicAcid'?'ácido ':'')+addStereoDescriptors(name);
 }
 function namedGraphsEquivalent(source,candidate){
   const pairKey=(a,b)=>a<b?a+','+b:b+','+a;
@@ -6688,27 +7070,118 @@ function nameSimpleAcidAnhydride(input){
   }
   return null;
 }
-function nameSimpleAcyclicPolyether(input,atoms,adj,heavy){
-  if(heavy.length>20||heavy.some(i=>!['C','O'].includes(atoms[i].el)||(atoms[i].q||0)!==0||atoms[i].stereo))return null;
-  const degree=new Map(heavy.map(i=>[i,adj[i].filter(edge=>atoms[edge.i].el!=='H').length]));
-  if(heavy.some(i=>degree.get(i)>2)||heavy.filter(i=>atoms[i].el==='O').length<2)return null;
-  const endpoints=heavy.filter(i=>degree.get(i)===1);if(endpoints.length!==2||endpoints.some(i=>atoms[i].el!=='C'))return null;
-  const atomIndex=new Map(atoms.map((atom,i)=>[atom.id,i])),heavySet=new Set(heavy);
-  const bonds=input.bonds.filter(bond=>{
-    const a=atomIndex.get(bond.a),b=atomIndex.get(bond.b);return heavySet.has(a)&&heavySet.has(b);
+function nameSimpleCyclicReplacement(input,atoms,adj,heavy){
+  if(heavy.length<3||heavy.length>20||heavy.some(i=>!['C','N','O','S'].includes(atoms[i].el)||(atoms[i].q||0)!==0||atoms[i].stereo))return null;
+  const heavySet=new Set(heavy),degree=new Map(heavy.map(i=>[i,adj[i].filter(edge=>heavySet.has(edge.i)).length]));
+  if(heavy.some(i=>degree.get(i)!==2))return null;
+  const bonds=iupacCoverageEdgesFromAdj(adj).filter(edge=>heavySet.has(edge.a)&&heavySet.has(edge.c));
+  if(bonds.length!==heavy.length||bonds.some(edge=>![1,2,3].includes(edge.o)))return null;
+  const hetero=heavy.filter(i=>atoms[i].el!=='C');if(!hetero.length)return null;
+  const multipleHantzsch=heavy.length<=10&&hetero.length>1&&bonds.every(edge=>edge.o===1);
+  if(heavy.length<=10&&!multipleHantzsch&&bonds.every(edge=>edge.o===1))return null;
+  const seniority={O:0,S:1,N:2},bestElement=hetero.map(i=>atoms[i].el).sort((a,b)=>seniority[a]-seniority[b])[0];
+  const starts=hetero.filter(i=>atoms[i].el===bestElement),candidates=[];
+  for(const start of starts)for(const first of adj[start].filter(edge=>heavySet.has(edge.i))){
+    const path=[start];let previous=start,current=first.i;
+    while(current!==start&&path.length<heavy.length){path.push(current);const next=adj[current].find(edge=>heavySet.has(edge.i)&&edge.i!==previous);if(!next)break;previous=current;current=next.i;}
+    if(path.length===heavy.length&&current===start)candidates.push(path);
+  }
+  if(!candidates.length)return null;
+  const ringBond=(a,b)=>adj[a].find(edge=>edge.i===b);
+  function descriptor(path){
+    const byElement=new Map(HANTZSCH_ELEMENTS.map(element=>[element,path.map((atom,loc)=>atoms[atom].el===element?loc+1:null).filter(Number.isInteger)]));
+    const heteroLocants=HANTZSCH_ELEMENTS.flatMap(element=>byElement.get(element)).sort((a,b)=>a-b),doubles=[],triples=[];
+    for(let loc=0;loc<path.length;loc++){const edge=ringBond(path[loc],path[(loc+1)%path.length]);if(edge?.o===2)doubles.push(loc+1);else if(edge?.o===3)triples.push(loc+1);}
+    return{byElement,heteroLocants,doubles,triples};
+  }
+  function compareDescriptors(left,right){
+    let difference=compareNumberingScores(left.heteroLocants,right.heteroLocants);if(difference)return difference;
+    for(const element of HANTZSCH_ELEMENTS){difference=compareNumberingScores(left.byElement.get(element),right.byElement.get(element));if(difference)return difference;}
+    difference=compareNumberingScores([...left.doubles,...left.triples].sort((a,b)=>a-b),[...right.doubles,...right.triples].sort((a,b)=>a-b));
+    return difference||compareNumberingScores(left.doubles,right.doubles)||compareNumberingScores(left.triples,right.triples);
+  }
+  candidates.sort((a,b)=>compareDescriptors(descriptor(a),descriptor(b)));
+  const order=candidates[0],chosen=descriptor(order),stem=IUPAC_STEMS[heavy.length];
+  if(!stem||HANTZSCH_ELEMENTS.some(element=>chosen.byElement.get(element).length>1&&!IUPAC_MULTIPLIERS[chosen.byElement.get(element).length]))return null;
+  const parts=HANTZSCH_ELEMENTS.filter(element=>chosen.byElement.get(element).length).map(element=>{
+    const locants=chosen.byElement.get(element),multiplier=locants.length>1?IUPAC_MULTIPLIERS[locants.length]:'';
+    return (hetero.length===1?'':locants.join(',')+'-')+multiplier+HANTZSCH_PREFIXES[element];
   });
-  if(bonds.some(bond=>bond.o!==1)||bonds.length!==heavy.length-1)return null;
-  const order=[endpoints[0]],seen=new Set(order);let previous=-1,current=endpoints[0];
-  while(order.length<heavy.length){const next=adj[current].find(edge=>atoms[edge.i].el!=='H'&&edge.i!==previous&&!seen.has(edge.i));if(!next)return null;previous=current;current=next.i;seen.add(current);order.push(current);}
-  if(current!==endpoints[1]||seen.size!==heavy.length||order.some((i,k)=>atoms[i].el==='O'&&(k===0||k===order.length-1)))return null;
-  const locations=path=>path.map((i,k)=>atoms[i].el==='O'?k+1:null).filter(Number.isInteger),reverse=order.slice().reverse(),oxygenLocants=[locations(order),locations(reverse)].sort(compareNumberingScores)[0],stem=IUPAC_STEMS[order.length];
-  const multiplier={2:'di',3:'tri',4:'tetra',5:'penta',6:'hexa',7:'hepta',8:'octa',9:'nona',10:'deca',11:'undeca',12:'dodeca',13:'trideca',14:'tetradeca',15:'pentadeca',16:'hexadeca',17:'heptadeca',18:'octadeca'}[oxygenLocants.length];
-  if(!stem||!multiplier)return null;
   const allEdges=iupacCoverageEdgesFromAdj(adj),coverage=createIUPACCoverageLedger(atoms,allEdges,adj);
   for(const atomIndex of order)if(!coverage.markAtom(atomIndex))return null;
-  for(let k=0;k<order.length-1;k++)if(!coverage.markBond(order[k],order[k+1]))return null;
+  for(let k=0;k<order.length;k++)if(!coverage.markBond(order[k],order[(k+1)%order.length]))return null;
   if(!coverage.complete())return null;
-  return oxygenLocants.join(',')+'-'+multiplier+'oxa'+stem+'ano';
+  const base=parentBase(order.length,true,false,chosen.doubles,chosen.triples);
+  if(!base)return null;
+  return parts.join('-')+base+'o';
+}
+/* P-44.3: acyclic parent paths rank by heteroatom count, skeletal length, then O > S > N. */
+function nameSimpleAcyclicReplacement(input,atoms,adj,heavy){
+  if(heavy.length>20||heavy.some(i=>!['C','N','O','S'].includes(atoms[i].el)||(atoms[i].q||0)!==0||atoms[i].stereo))return null;
+  const heavySet=new Set(heavy),heavyEdges=iupacCoverageEdgesFromAdj(adj).filter(edge=>heavySet.has(edge.a)&&heavySet.has(edge.c));
+  if(heavyEdges.length!==heavy.length-1||heavyEdges.some(edge=>![1,2,3].includes(edge.o)))return null;
+  const degree=new Map(heavy.map(atom=>[atom,adj[atom].filter(edge=>heavySet.has(edge.i)).length]));
+  if(heavy.some(atom=>degree.get(atom)>3))return null;
+  const leaves=heavy.filter(atom=>degree.get(atom)===1);if(leaves.length<2)return null;
+  const treePath=(start,end)=>{
+    const previous=new Map([[start,-1]]),todo=[start];
+    for(let p=0;p<todo.length;p++){const atom=todo[p];if(atom===end)break;for(const edge of adj[atom])if(heavySet.has(edge.i)&&!previous.has(edge.i)){previous.set(edge.i,atom);todo.push(edge.i);}}
+    if(!previous.has(end))return null;const path=[];for(let atom=end;atom!==-1;atom=previous.get(atom))path.push(atom);return path.reverse();
+  };
+  const compareVectors=(left,right)=>{for(let i=0;i<Math.max(left.length,right.length);i++){const difference=(left[i]??Infinity)-(right[i]??Infinity);if(difference)return difference;}return 0;};
+  const structuralScore=path=>{
+    const counts={O:0,S:0,N:0};for(const atom of path)if(atoms[atom].el!=='C')counts[atoms[atom].el]++;
+    const multiple=[],doubles=[];for(let p=0;p<path.length-1;p++){const edge=adj[path[p]].find(item=>item.i===path[p+1]);if(edge?.o>1){multiple.push(edge.o);if(edge.o<2.75)doubles.push(edge.o);}}
+    return[-counts.O-counts.S-counts.N,-path.length,-counts.O,-counts.S,-counts.N,-multiple.length,-doubles.length];
+  };
+  const candidates=[];
+  for(let i=0;i<leaves.length;i++)for(let j=i+1;j<leaves.length;j++){
+    if(atoms[leaves[i]].el!=='C'||atoms[leaves[j]].el!=='C')continue;
+    const path=treePath(leaves[i],leaves[j]);if(!path||!path.some(atom=>atoms[atom].el!=='C'))continue;
+    const parentSet=new Set(path),doubles=[],triples=[],groups=new Map(),coverage=createIUPACCoverageLedger(atoms,iupacCoverageEdgesFromAdj(adj),adj),accounted=new Set(path);let valid=true;
+    for(const atom of path)if(!coverage.markAtom(atom))valid=false;
+    for(let p=0;p<path.length-1;p++){
+      const edge=adj[path[p]].find(item=>item.i===path[p+1]);if(!edge||!coverage.markBond(path[p],path[p+1]))valid=false;
+      if(edge?.o===2)doubles.push(p+1);else if(edge?.o===3)triples.push(p+1);
+    }
+    for(let loc=0;loc<path.length&&valid;loc++)for(const edge of adj[path[loc]])if(!parentSet.has(edge.i)&&atoms[edge.i].el!=='H'){
+      if(atoms[path[loc]].el!=='C'||atoms[edge.i].el!=='C'||edge.o!==1){valid=false;break;}
+      const label=describeAlkyl(edge.i,parentSet,adj,atoms);if(!label){valid=false;break;}
+      if(!groups.has(label))groups.set(label,[]);groups.get(label).push(loc+1);
+      const fragment=new Set(collectConnectedAtoms(edge.i,parentSet,adj,atoms));
+      if(!coverage.markAttachedFragment(fragment,parentSet,path[loc],edge.i)){valid=false;break;}
+      for(const atom of fragment)accounted.add(atom);
+    }
+    if(!valid||heavy.some(atom=>!accounted.has(atom))||!coverage.complete())continue;
+    const reverse=path.slice().reverse();
+    const numbering=order=>{
+      const byElement=new Map(HANTZSCH_ELEMENTS.map(element=>[element,order.map((atom,loc)=>atoms[atom].el===element?loc+1:null).filter(Number.isInteger)]));
+      const heteroLocants=HANTZSCH_ELEMENTS.flatMap(element=>byElement.get(element)).sort((a,b)=>a-b),perElement=HANTZSCH_ELEMENTS.flatMap(element=>byElement.get(element));
+      const unsaturation=[],doubleLocants=[];for(let loc=0;loc<order.length-1;loc++){const edge=adj[order[loc]].find(item=>item.i===order[loc+1]);if(edge?.o>1){unsaturation.push(loc+1);if(edge.o<2.75)doubleLocants.push(loc+1);}}
+      const orientedGroups=new Map([...groups].map(([name,locants])=>[name,locants.map(loc=>order===path?loc:path.length+1-loc)]));
+      const substituents=[...orientedGroups.values()].flat().sort((a,b)=>a-b);
+      return{order,byElement,groups:orientedGroups,score:[...heteroLocants,99,...perElement,99,...unsaturation,99,...doubleLocants,99,...substituents]};
+    };
+    const forward=numbering(path),backward=numbering(reverse),chosen=compareVectors(forward.score,backward.score)<=0?forward:backward;
+    candidates.push({order:chosen.order,byElement:chosen.byElement,score:chosen.score,structural:structuralScore(path),groups:chosen.groups,doubles:chosen.order===path?doubles:doubles.map(loc=>path.length-1-loc).sort((a,b)=>a-b),triples:chosen.order===path?triples:triples.map(loc=>path.length-1-loc).sort((a,b)=>a-b)});
+  }
+  if(!candidates.length)return null;
+  candidates.sort((left,right)=>compareVectors(left.structural,right.structural)||compareVectors(left.score,right.score));
+  const chosen=candidates[0],stem=IUPAC_STEMS[chosen.order.length];if(!stem)return null;
+  const replacement=HANTZSCH_ELEMENTS.filter(element=>chosen.byElement.get(element).length).map(element=>{
+    const locants=chosen.byElement.get(element),multiplier=locants.length>1?IUPAC_MULTIPLIERS[locants.length]:'';
+    if(locants.length>1&&!multiplier)return null;
+    return locants.join(',')+'-'+(multiplier||'')+HANTZSCH_PREFIXES[element];
+  });
+  if(replacement.some(part=>!part))return null;
+  const substituents=[...chosen.groups].sort((left,right)=>comparePrefixNames(left[0],right[0])).map(([name,locants])=>{
+    const multiplier=locants.length>1?IUPAC_MULTIPLIERS[locants.length]:'';
+    return locants.sort((a,b)=>a-b).join(',')+'-'+(multiplier||'')+name;
+  });
+  if(substituents.some(part=>!part))return null;
+  const base=parentBase(chosen.order.length,false,false,chosen.doubles,chosen.triples);if(!base)return null;
+  const prefix=[...substituents,...replacement].join('-');
+  return(prefix?prefix:'')+base+'o';
 }
 function collectAlkylAtoms(start,blocked,adj,atoms){
   const group=[],seen=new Set([start]),todo=[start];
@@ -6800,6 +7273,27 @@ function describeAlkyl(start,blocked,adj,atoms){
   if(group.length===2)return'etil';
   return root+'an-'+attachment+'-il';
 }
+/* P-29.3.2: an exocyclic double bond is represented by a carbon-only alkylidene prefix. */
+function describeAlkylidene(start,parent,blocked,adj,atoms){
+  if(atoms[start]?.el!=='C')return null;
+  const parentEdges=adj[start].filter(edge=>edge.i===parent);if(parentEdges.length!==1||parentEdges[0].o!==2)return null;
+  const group=collectAlkylAtoms(start,blocked,adj,atoms),groupSet=new Set(group);if(!group.length||group.length>20)return null;
+  const groupAdj=new Map(group.map(atom=>[atom,[]]));let internalEdges=0;
+  for(const atom of group)for(const edge of adj[atom]){
+    if(atoms[edge.i].el==='H')continue;
+    if(groupSet.has(edge.i)){
+      if(edge.o!==1)return null;
+      if(atom<edge.i){internalEdges++;groupAdj.get(atom).push(edge.i);groupAdj.get(edge.i).push(atom);}
+    }else if(atom!==start||edge.i!==parent||edge.o!==2)return null;
+  }
+  if(internalEdges!==group.length-1||group.some(atom=>groupAdj.get(atom).length>2))return null;
+  const ends=group.length===1?[start]:group.filter(atom=>groupAdj.get(atom).length===1);if(group.length>1&&ends.length!==2)return null;
+  const chain=[ends[0]];let previous=-1;
+  while(chain.length<group.length){const current=chain.at(-1),next=groupAdj.get(current).find(atom=>atom!==previous);if(next===undefined)return null;previous=current;chain.push(next);}
+  if(chain.at(-1)!==ends.at(-1))return null;
+  const locant=Math.min(chain.indexOf(start)+1,group.length+1-chain.indexOf(start));
+  return alkylidenePrefixName(group.length,locant);
+}
 function alkoxyPrefixFromAlkyl(name){
   if(name==='metil')return'metoxi';if(name==='etil')return'etoxi';
   const match=/^([a-z]+)an-(\d+)-il$/.exec(name||'');if(!match)return null;
@@ -6833,15 +7327,28 @@ function nameSimpleNAlkylAmine(atoms,adj,heavy){
   return prefixes.length?prefixes.join('-')+parentName:parentName;
 }
 function parentBase(n,cyclic,aromatic,doubles,triples,omitSimpleUnsaturationLocant=false){
-  if(aromatic)return'benzen';const stem=IUPAC_STEMS[n]||'pent';const pre=cyclic?'ciclo':'';
-  if(doubles.length&&triples.length)return null;
-  if(doubles.length===1)return (omitSimpleUnsaturationLocant||cyclic&&doubles[0]===1)?pre+stem+'en':pre+stem+'-'+doubles[0]+'-en';
-  if(doubles.length===2)return pre+stem+'a-'+doubles.join(',')+'-dien';
-  if(doubles.length===3)return pre+stem+'a-'+doubles.join(',')+'-trien';
-  if(doubles.length>3||triples.length>3)return null;
-  if(triples.length===1)return (omitSimpleUnsaturationLocant||cyclic&&triples[0]===1)?pre+stem+'in':pre+stem+'-'+triples[0]+'-in';
-  if(triples.length===2)return pre+stem+'a-'+triples.join(',')+'-diin';
-  if(triples.length===3)return pre+stem+'a-'+triples.join(',')+'-triin';
+  if(aromatic)return'benzen';const stem=IUPAC_STEMS[n]||'pent',pre=cyclic?'ciclo':'',total=doubles.length+triples.length;
+  if(doubles.some(loc=>!Number.isInteger(loc)||loc<1||loc>(cyclic?n:n-1))||triples.some(loc=>!Number.isInteger(loc)||loc<1||loc>(cyclic?n:n-1)))return null;
+  if(new Set([...doubles,...triples]).size!==total)return null;
+  const ending=(kind,count)=>{
+    const end=kind==='double'?'en':'in';if(count===1)return end;
+    const multiplier=IUPAC_MULTIPLIERS[count];return multiplier?multiplier+end:null;
+  };
+  if(doubles.length&&triples.length){
+    const doubleEnding=ending('double',doubles.length),tripleEnding=ending('triple',triples.length);
+    if(!doubleEnding||!tripleEnding)return null;
+    return pre+stem+'a-'+doubles.join(',')+'-'+doubleEnding+'-'+triples.join(',')+'-'+tripleEnding;
+  }
+  if(doubles.length){
+    const doubleEnding=ending('double',doubles.length);if(!doubleEnding)return null;
+    if(doubles.length===1&&(omitSimpleUnsaturationLocant||cyclic&&doubles[0]===1))return pre+stem+doubleEnding;
+    return pre+stem+(doubles.length===1?'-':'a-')+doubles.join(',')+'-'+doubleEnding;
+  }
+  if(triples.length){
+    const tripleEnding=ending('triple',triples.length);if(!tripleEnding)return null;
+    if(triples.length===1&&(omitSimpleUnsaturationLocant||cyclic&&triples[0]===1))return pre+stem+tripleEnding;
+    return pre+stem+(triples.length===1?'-':'a-')+triples.join(',')+'-'+tripleEnding;
+  }
   return pre+stem+'an';
 }
 function sameLocantSet(a,b){const x=a.slice().sort((u,v)=>u-v),y=b.slice().sort((u,v)=>u-v);return x.length===y.length&&x.every((loc,i)=>loc===y[i]);}
@@ -6871,8 +7378,8 @@ function linkedSuffix(base,locants,suffix){
 }
 function renderName(subs,base,kind,suffixLocs,doubles,triples,cyclic=false,aromatic=false,parentLength=0,esterAlkylName='',nSubstituents=[],acidHalideName=''){
   const groups=new Map();for(const x of subs){if(!x.name)continue;if(!groups.has(x.name))groups.set(x.name,[]);groups.get(x.name).push(x.loc);}
-  const mult={2:'di',3:'tri',4:'tetra',5:'penta',6:'hexa',7:'hepta',8:'octa',9:'nona',10:'deca'};
-  if([...groups.values()].some(locs=>locs.length>10))return null;
+  const mult=IUPAC_MULTIPLIERS;
+  if([...groups.values()].some(locs=>locs.length>IUPAC_MAX_MULTIPLIER_COUNT))return null;
   const prefixCount=[...groups.values()].reduce((count,locs)=>count+locs.length,0);
   const omitPrefixLocants=parentLength===1||(prefixCount===1&&parentIsVertexTransitive(parentLength,cyclic,doubles,triples,suffixLocs));
   const prefixEntries=[...groups].map(([name,locs])=>{
@@ -6880,9 +7387,10 @@ function renderName(subs,base,kind,suffixLocs,doubles,triples,cyclic=false,aroma
     return{name,locants:locs,text:(omitPrefixLocants?'':locs.join(',')+'-')+(mult[locs.length]||'')+citedName};
   });
   const nCounts=new Map();for(const name of nSubstituents)nCounts.set(name,(nCounts.get(name)||0)+1);
+  if([...nCounts.values()].some(count=>count>IUPAC_MAX_MULTIPLIER_COUNT))return null;
   for(const[name,count]of nCounts){
     const complex=/^[a-z]+an-\d+-il$/.test(name),cited=complex?'('+name+')':name;
-    prefixEntries.push({name,locants:[],text:count===1?'N-'+cited:'N,N-'+(mult[count]||'')+cited});
+    prefixEntries.push({name,locants:[],text:count===1?'N-'+cited:Array(count).fill('N').join(',')+'-'+mult[count]+cited});
   }
   prefixEntries.sort((a,b)=>comparePrefixNames(a.name,b.name)||compareNumberingScores(a.locants,b.locants));
   let prefix=prefixEntries.map(entry=>entry.text).join('-');
@@ -6890,23 +7398,22 @@ function renderName(subs,base,kind,suffixLocs,doubles,triples,cyclic=false,aroma
   let body=hydride;
   if(kind==='ringacid')body=aromatic?'benzoico':base+'ocarboxílico';
   else if(kind==='ester')body=base+'oato de '+esterAlkylName+'a';
-  else if(kind==='ringaldehyde')body='benzaldeído';
-  else if(kind==='ringamide')body='benzamida';
-  else if(kind==='acid')body=base+'oico';
+  else if(kind==='ringaldehyde')body=aromatic?'benzaldeído':base+'ocarbaldeído';
+  else if(kind==='ringamide')body=aromatic?'benzamida':base+'ocarboxamida';
+  else if(kind==='acid'){const suffix={1:'oico',2:'odioico'}[suffixLocs.length];if(!suffix)return null;body=base+suffix;}
+  else if(kind==='polyacid'){const loc=suffixLocs.length?suffixLocs:[1],suffix=IUPAC_SUFFIX_BY_KIND.polyacid[loc.length];if(!suffix)return null;body=linkedSuffix(base,loc,suffix);}
+  else if(kind==='polyAldehyde'){const loc=suffixLocs.length?suffixLocs:[1],suffix=IUPAC_SUFFIX_BY_KIND.polyAldehyde[loc.length];if(!suffix)return null;body=linkedSuffix(base,loc,suffix).replace(/carbaldeido$/,'carbaldeído');}
   else if(['sulfonicAcid','sulfinicAcid','phosphonicAcid'].includes(kind)){
-    const suffix={sulfonicAcid:'sulfonico',sulfinicAcid:'sulfinico',phosphonicAcid:'fosfonico'}[kind],loc=suffixLocs.length?suffixLocs:[1],ending=loc.length===1?suffix:({2:'di',3:'tri'}[loc.length]||'')+suffix;
-    if(!['sulfonico','disulfonico','trisulfonico','sulfinico','disulfinico','trisulfinico','fosfonico','difosfonico','trifosfonico'].includes(ending))return null;
+    const loc=suffixLocs.length?suffixLocs:[1],ending=IUPAC_SUFFIX_BY_KIND[kind][loc.length];if(!ending)return null;
     body=linkedSuffix(base,loc,ending);
   }
   else if(kind==='acidHalide')body=acidHalideName+' de '+base+'oíla';
-  else if(kind==='aldehyde')body=base+'al';
-  else if(kind==='amide')body=base+'amida';
-  else if(kind==='nitrile')body=base+'onitrila';
-  else if(kind==='ketone'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'ona',2:'diona',3:'triona',4:'tetraona'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
-  else if(kind==='alcohol'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'ol',2:'diol',3:'triol',4:'tetrol',5:'pentol'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
-  else if(kind==='amine'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'amina',2:'diamina',3:'triamina',4:'tetramina'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
-  else if(kind==='thiol'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'tiol',2:'ditiol',3:'tritiol',4:'tetratiol'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
-  else if(kind==='imine'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'imina',2:'diimina',3:'triimina',4:'tetraimina'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
+  else if(['aldehyde','amide','nitrile'].includes(kind)){
+    const loc=suffixLocs.length?suffixLocs:[1],suffix=IUPAC_SUFFIX_BY_KIND[kind][loc.length];if(!suffix)return null;
+    body=loc.length===1?base+suffix:linkedSuffix(base,loc,suffix);
+  }
+  else if(['ketone','alcohol','amine'].includes(kind)){const loc=suffixLocs.length?suffixLocs:[1],suffix=IUPAC_SUFFIX_BY_KIND[kind][loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
+  else if(['thiol','imine'].includes(kind)){const loc=suffixLocs.length?suffixLocs:[1],suffix=IUPAC_SUFFIX_BY_KIND[kind][loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
   if(aromatic&&kind==='amine'&&suffixLocs.length===1&&suffixLocs[0]===1)body='benzenamina';
   if(aromatic&&kind==='alcohol'&&suffixLocs.length===1&&suffixLocs[0]===1){body='fenol';if(prefix==='1-hidroxi')prefix='';}
   return kind==='acidHalide'&&prefix?prefix+'-'+body:prefix+body;
@@ -6927,8 +7434,8 @@ function nameSimplePrimaryAmine(input=mol){
     if(atoms[a].el==='H'||atoms[b].el==='H')continue;
     if(bond.o!==1)return null;
     if(atoms[a].el==='C'&&atoms[b].el==='C'){carbonAdj.get(a).push(b);carbonAdj.get(b).push(a);carbonEdges++;}
-    else if(a===nitrogen&&atoms[b].el==='C'&&!attachment)attachment=b;
-    else if(b===nitrogen&&atoms[a].el==='C'&&!attachment)attachment=a;
+    else if(a===nitrogen&&atoms[b].el==='C'&&attachment===null)attachment=b;
+    else if(b===nitrogen&&atoms[a].el==='C'&&attachment===null)attachment=a;
     else return null;
   }
   if(attachment===null||carbonEdges!==carbons.length-1||[...carbonAdj.values()].some(neighbors=>neighbors.length>2))return null;
