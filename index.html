@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-uvVQ2FShDOPbvDmQID/g/06w161AQVF2cssNUIB7P38='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AxDtRW9Dv8aE4Aai5b+HWW+2DWCBtKz1rJcGIECyiCk='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Editor de moléculas simples, executado no navegador.">
 <meta property="og:title" content="Moleculário – Editor molecular">
@@ -397,8 +397,8 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 </dialog>
 <dialog id="dlgCredits" aria-labelledby="dlgCreditsTitle">
   <h3 id="dlgCreditsTitle">Créditos e referências</h3>
-  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.1<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
-  <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. O conversor IUPAC é parcial; a animação vibracional é qualitativa e não calcula frequências espectroscópicas.</p>
+  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.2<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
+  <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. A animação vibracional é qualitativa e não calcula frequências espectroscópicas.</p>
   <p><b>Desenvolvimento:</b> este app foi feito por ChatGPT (OpenAI), Claude (Anthropic) e Gemini (Google), com base nas orientações do usuário.</p>
   <ul>
     <li><b>SMILES e nomenclatura:</b> <a href="https://opensmiles.org/opensmiles.pdf" target="_blank" rel="noopener noreferrer">OpenSMILES</a> (subconjunto) e <a href="https://iupac.qmul.ac.uk/BlueBook/" target="_blank" rel="noopener noreferrer">IUPAC Blue Book</a> (P-1, P-4 e P-9).</li>
@@ -4710,14 +4710,14 @@ function cancelPending3DForLayout(){
 
 /* ================= Biblioteca interna ================= */
 const LIB=[
-[['água','water','h2o'],'O'],[['metano','methane'],'C'],[['etano','ethane'],'CC'],
+[['água','water','h2o'],'O'],
 [['eteno','etileno','ethylene'],'C=C'],[['propeno','propileno','propene'],'CC=C'],[['propadieno','aleno','allene'],'C=C=C'],[['butadieno','1,3-butadieno','butadiene'],'C=CC=C'],
-[['etino','acetileno','acetylene'],'C#C'],[['ciclopropano','cyclopropane'],'C1CC1'],[['ciclopentano','cyclopentane'],'C1CCCC1'],
-[['ciclohexano','cyclohexane'],'C1CCCCC1'],[['benzeno','benzene'],'C1=CC=CC=C1'],[['tolueno','toluene'],'CC1=CC=CC=C1'],
+[['etino','acetileno','acetylene'],'C#C'],
+[['benzeno','benzene'],'C1=CC=CC=C1'],[['tolueno','toluene'],'CC1=CC=CC=C1'],
 [['fenol','phenol'],'OC1=CC=CC=C1'],[['anilina','aniline'],'NC1=CC=CC=C1'],[['naftaleno','naphthalene'],'C1=CC=C2C=CC=CC2=C1'],
 [['piridina','pyridine'],'C1=CC=NC=C1'],[['indol','indole'],'C1=CC=C2C(=C1)C=CN2'],[['furano','furan'],'C1=COC=C1'],
 [['tiofeno','thiophene'],'C1=CSC=C1'],[['pirrol','pyrrole'],'C1=CNC=C1'],[['tetrahidrofurano','thf'],'C1CCOC1'],
-[['metanol','methanol'],'CO'],[['etanol','ethanol','álcool etílico'],'CCO'],[['isopropanol','2-propanol'],'CC(C)O'],
+[['isopropanol','2-propanol'],'CC(C)O'],
 [['etilenoglicol','ethylene glycol'],'OCCO'],[['glicerol','glicerina','glycerol'],'OCC(O)CO'],
 [['formaldeído','formaldehyde'],'C=O'],[['acetaldeído','acetaldehyde'],'CC=O'],[['acetona','acetone'],'CC(C)=O'],
 [['ácido fórmico','formic acid'],'C(=O)O'],[['ácido acético','acetic acid'],'CC(=O)O'],[['acetato de etila','ethyl acetate'],'CCOC(C)=O'],
@@ -4740,23 +4740,9 @@ const LIB=[
   [['isobutano','2-metilpropano','isobutane'],'CC(C)C'],
   [['isopentano','2-metilbutano','isopentane'],'CC(C)CC'],
   [['neopentano','2,2-dimetilpropano','neopentane'],'CC(C)(C)C'],
-  [['1-buteno','but-1-eno','1-butene'],'C=CCC'],
-  [['2-buteno','but-2-eno','2-butene'],'CC=CC'],
-  [['1-penteno','pent-1-eno','1-pentene'],'C=CCCC'],
-  [['2-penteno','pent-2-eno','2-pentene'],'CC=CCC'],
-  [['1-hexeno','hex-1-eno','1-hexene'],'C=CCCCC'],
-  [['1-butino','but-1-ino','1-butyne'],'C#CCC'],
-  [['2-butino','but-2-ino','2-butyne'],'CC#CC'],
-  [['1-hexino','hex-1-ino','1-hexyne'],'C#CCCCC'],
-  [['2-hexino','hex-2-ino','2-hexyne'],'CC#CCCC'],
-  [['ciclobutano','cyclobutane'],'C1CCC1'],
-  [['ciclopenteno','cyclopentene'],'C1=CCCC1'],
-  [['cicloheptano','cycloheptane'],'C1CCCCCC1'],
-  [['metilciclohexano','methylcyclohexane'],'CC1CCCCC1'],
   [['isopreno','isoprene'],'C=C(C)C=C'],
 
   /* Aromáticos e derivados */
-  [['etilbenzeno','ethylbenzene'],'CCc1ccccc1'],
   [['o-xileno','1,2-dimetilbenzeno','o-xylene'],'Cc1ccccc1C'],
   [['m-xileno','1,3-dimetilbenzeno','m-xylene'],'Cc1cccc(C)c1'],
   [['p-xileno','1,4-dimetilbenzeno','p-xylene'],'Cc1ccc(C)cc1'],
@@ -4765,9 +4751,6 @@ const LIB=[
   [['benzaldeído','benzaldehyde'],'O=Cc1ccccc1'],
   [['álcool benzílico','benzyl alcohol'],'OCc1ccccc1'],
   [['anisol','metoxibenzeno','anisole'],'COc1ccccc1'],
-  [['clorobenzeno','chlorobenzene'],'Clc1ccccc1'],
-  [['bromobenzeno','bromobenzene'],'Brc1ccccc1'],
-  [['nitrobenzeno','nitrobenzene'],'O=[N+]([O-])c1ccccc1'],
   [['acetofenona','acetophenone'],'CC(=O)c1ccccc1'],
   [['fenilacetileno','phenylacetylene'],'C#Cc1ccccc1'],
   [['bifenila','biphenyl'],'c1ccccc1-c1ccccc1'],
@@ -4778,24 +4761,12 @@ const LIB=[
   [['p-cresol','4-metilfenol'],'Cc1ccc(O)cc1'],
 
   /* Álcoois, éteres, aldeídos, cetonas, ácidos e derivados */
-  [['1-propanol','propan-1-ol','propanol'],'CCCO'],
-  [['1-butanol','butan-1-ol'],'CCCCO'],
-  [['2-butanol','butan-2-ol'],'CC(O)CC'],
   [['terc-butanol','tert-butanol','2-metil-2-propanol'],'CC(C)(C)O'],
-  [['1-pentanol','pentan-1-ol'],'CCCCCO'],
-  [['1-hexanol','hexan-1-ol'],'CCCCCCO'],
-  [['ciclohexanol','cyclohexanol'],'OC1CCCCC1'],
   [['propilenoglicol','1,2-propanodiol','propylene glycol'],'CC(O)CO'],
-  [['1,3-propanodiol','propane-1,3-diol'],'OCCCO'],
-  [['1,4-butanodiol','butane-1,4-diol'],'OCCCCO'],
   [['éter dimetílico','dimethyl ether'],'COC'],
   [['éter metil-etílico','methoxyethane','ethyl methyl ether'],'CCOC'],
   [['1,2-dimetoxietano','dimethoxyethane','glyme'],'COCCOC'],
   [['1,4-dioxano','dioxane','1,4-dioxane'],'C1COCCO1'],
-  [['propanal','propionaldeído'],'CCC=O'],
-  [['butanal','butiraldeído'],'CCCC=O'],
-  [['2-butanona','butan-2-one','methyl ethyl ketone'],'CCC(=O)C'],
-  [['ciclohexanona','cyclohexanone'],'O=C1CCCCC1'],
   [['formiato de metila','methyl formate'],'COC=O'],
   [['acetato de metila','methyl acetate'],'COC(C)=O'],
   [['propionato de metila','methyl propanoate'],'CCC(=O)OC'],
@@ -4813,7 +4784,6 @@ const LIB=[
   [['salicilato de metila','methyl salicylate'],'COC(=O)c1ccccc1O'],
   [['formiato de etila','ethyl formate'],'CCOC=O'],
   [['acetamida','acetamide'],'CC(=O)N'],
-  [['propanamida','propionamida','propanamide'],'CCC(=O)N'],
   [['acetanilida','acetanilide'],'CC(=O)Nc1ccccc1'],
   [['catecol','pirocatecol','catechol'],'Oc1ccccc1O'],
   [['resorcinol','1,3-dihidroxibenzeno'],'Oc1cccc(O)c1'],
@@ -4845,14 +4815,6 @@ const LIB=[
   [['trióxido de enxofre','sulfur trioxide'],'O=S(=O)=O'],
   [['dissulfeto de carbono','carbon disulfide'],'S=C=S'],
   [['pentacloreto de fósforo','phosphorus pentachloride'],'ClP(Cl)(Cl)(Cl)Cl'],
-  [['clorometano','chloromethane'],'CCl'],
-  [['bromometano','bromomethane'],'CBr'],
-  [['fluoroetano','fluoroethane'],'CCF'],
-  [['cloroetano','chloroethane'],'CCCl'],
-  [['bromoetano','bromoethane'],'CCBr'],
-  [['iodometano','iodomethane'],'CI'],
-  [['diclorometano','dichloromethane'],'ClCCl'],
-  [['tetracloreto de carbono','carbon tetrachloride'],'ClC(Cl)(Cl)Cl'],
   [['1,2-dicloroetano','1,2-dichloroethane'],'ClCCCl'],
   [['cloreto de vinila','cloroeteno','vinyl chloride'],'C=CCl'],
   [['1,2-dibromoetano','1,2-dibromoethane'],'BrCCBr'],
@@ -4886,12 +4848,10 @@ const LIB=[
   [['guanina','guanine'],'NC1=NC2=C(N=CN2)C(=O)N1']
 ];
 const IUPAC_NAMES=Object.freeze({
-  agua:'oxidano',metano:'metano',etano:'etano',
-  eteno:'eteno',propeno:'prop-1-eno',propadieno:'propa-1,2-dieno',butadieno:'buta-1,3-dieno',etino:'etino',
-  ciclopropano:'ciclopropano',ciclopentano:'ciclopentano',ciclohexano:'ciclohexano',
+  agua:'oxidano',propeno:'prop-1-eno',propadieno:'propa-1,2-dieno',butadieno:'buta-1,3-dieno',
   benzeno:'benzeno',tolueno:'metilbenzeno',fenol:'fenol',anilina:'benzenamina',naftaleno:'naftaleno',
   piridina:'piridina',indol:'1H-indol',furano:'furano',tiofeno:'tiofeno',pirrol:'1H-pirrol',tetrahidrofurano:'oxolano',
-  metanol:'metanol',etanol:'etanol',isopropanol:'propan-2-ol',etilenoglicol:'etano-1,2-diol',glicerol:'propano-1,2,3-triol',
+  isopropanol:'propan-2-ol',etilenoglicol:'etano-1,2-diol',glicerol:'propano-1,2,3-triol',
   formaldeido:'metanal',acetaldeido:'etanal',acetona:'propan-2-ona',
   'acido formico':'ácido metanoico','acido acetico':'ácido etanoico','acetato de etila':'etanoato de etila',
   'eter dietilico':'etoxietano','acido benzoico':'ácido benzoico','acido latico':'ácido 2-hidroxipropanoico',
@@ -4908,19 +4868,17 @@ const IUPAC_NAMES=Object.freeze({
   isobutano:'2-metilpropano',isopentano:'2-metilbutano',neopentano:'2,2-dimetilpropano',
   '1-buteno':'but-1-eno','2-buteno':'but-2-eno','1-penteno':'pent-1-eno','2-penteno':'pent-2-eno','1-hexeno':'hex-1-eno',
   '1-butino':'but-1-ino','2-butino':'but-2-ino','1-hexino':'hex-1-ino','2-hexino':'hex-2-ino',
-  ciclobutano:'ciclobutano',ciclopenteno:'ciclopenteno',cicloheptano:'cicloheptano',metilciclohexano:'metilciclohexano',
   isopreno:'2-metilbuta-1,3-dieno',etilbenzeno:'etilbenzeno','o-xileno':'1,2-dimetilbenzeno',
   'm-xileno':'1,3-dimetilbenzeno','p-xileno':'1,4-dimetilbenzeno',estireno:'etenilbenzeno',
   cumeno:'propan-2-ilbenzeno',benzaldeido:'benzaldeído','alcool benzilico':'fenilmetanol',anisol:'metoxibenzeno',
-  clorobenzeno:'clorobenzeno',bromobenzeno:'bromobenzeno',nitrobenzeno:'nitrobenzeno',
   acetofenona:'1-feniletan-1-ona',fenilacetileno:'etinilbenzeno',bifenila:'bifenil',benzonitrila:'benzonitrila',
   'cloreto de benzila':'(clorometil)benzeno','o-cresol':'2-metilfenol','m-cresol':'3-metilfenol','p-cresol':'4-metilfenol',
   '1-propanol':'propan-1-ol','1-butanol':'butan-1-ol','2-butanol':'butan-2-ol',
   'terc-butanol':'2-metilpropan-2-ol','1-pentanol':'pentan-1-ol','1-hexanol':'hexan-1-ol',
-  ciclohexanol:'ciclohexanol',propilenoglicol:'propano-1,2-diol','1,3-propanodiol':'propano-1,3-diol',
+  propilenoglicol:'propano-1,2-diol','1,3-propanodiol':'propano-1,3-diol',
   '1,4-butanodiol':'butano-1,4-diol','eter dimetilico':'metoximetano','eter metil-etilico':'metoxietano',
-  '1,2-dimetoxietano':'1,2-dimetoxietano','1,4-dioxano':'1,4-dioxano',propanal:'propanal',butanal:'butanal',
-  '2-butanona':'butan-2-ona',ciclohexanona:'ciclohexanona','formiato de metila':'metanoato de metila',
+  '1,2-dimetoxietano':'1,2-dimetoxietano','1,4-dioxano':'1,4-dioxano',
+  '2-butanona':'butan-2-ona','formiato de metila':'metanoato de metila',
   'acetato de metila':'etanoato de metila','propionato de metila':'propanoato de metila',
   'acido propionico':'ácido propanoico','acido butirico':'ácido butanoico','acido oxalico':'ácido etanodioico',
   'acido malonico':'ácido propanodioico','acido succinico':'ácido butanodioico','acido adipico':'ácido hexanodioico',
@@ -4939,10 +4897,7 @@ const IUPAC_NAMES=Object.freeze({
   'bicarbonato de sodio':'hidrogenocarbonato de sódio','carbonato de calcio':'carbonato de cálcio',
   'dioxido de enxofre':'dióxido de enxofre','trioxido de enxofre':'trióxido de enxofre',
   'dissulfeto de carbono':'dissulfeto de carbono','pentacloreto de fosforo':'pentacloreto de fósforo',
-  clorometano:'clorometano',bromometano:'bromometano',fluoroetano:'fluoroetano',cloroetano:'cloroetano',
-  bromoetano:'bromoetano',iodometano:'iodometano',diclorometano:'diclorometano',
-  'tetracloreto de carbono':'tetraclorometano','1,2-dicloroetano':'1,2-dicloroetano',
-  'cloreto de vinila':'cloroeteno','1,2-dibromoetano':'1,2-dibromoetano'
+    'tetracloreto de carbono':'tetraclorometano','cloreto de vinila':'cloroeteno'
 });
 const searchNames=[...new Set(LIB.flatMap(m=>[m[0][0],IUPAC_NAMES[norm(m[0][0])]].filter(Boolean)))];
 $('#molList').innerHTML=searchNames.map(name=>`<option value="${escapeMarkup(name)}">`).join('');
