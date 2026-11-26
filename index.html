@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AxDtRW9Dv8aE4Aai5b+HWW+2DWCBtKz1rJcGIECyiCk='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-NwBtKAtOrOQHSOZ3dw2L7290QtUzdp8IYJvBZg9zKME='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Editor de moléculas simples, executado no navegador.">
 <meta property="og:title" content="Moleculário – Editor molecular">
@@ -397,7 +397,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 </dialog>
 <dialog id="dlgCredits" aria-labelledby="dlgCreditsTitle">
   <h3 id="dlgCreditsTitle">Créditos e referências</h3>
-  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.2<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
+  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.3<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
   <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. A animação vibracional é qualitativa e não calcula frequências espectroscópicas.</p>
   <p><b>Desenvolvimento:</b> este app foi feito por ChatGPT (OpenAI), Claude (Anthropic) e Gemini (Google), com base nas orientações do usuário.</p>
   <ul>
@@ -601,8 +601,9 @@ function findRings(n,edges){
 }
 
 /* ================= Modelo da molécula (editor 2D) ================= */
-let mol={atoms:[],bonds:[],nid:1},moleculeMetadata=null;
-let amap=new Map(),adj=new Map(),rings=[],bpair=new Map();
+let mol={atoms:[],bonds:[],nid:1},moleculeMetadata=null,iupacNameCache=null;
+/* Keep cycle detection keyed to connectivity, not coordinates, charges, or bond orders. */
+let amap=new Map(),adj=new Map(),rings=[],bpair=new Map(),ringTopologySignature=null;
 const pk=(a,b)=>a<b?a+','+b:b+','+a;
 let autoFormalCharges=true;
 const AUTO_FORMAL_STATES={
@@ -679,9 +680,13 @@ function reindex(){
       a._h=Number.isInteger(a.hExplicit)?a.hExplicit:implicitH(a.el,a.q,bs);
     }
   }
-  const idx=new Map(mol.atoms.map((a,i)=>[a.id,i]));
-  rings=findRings(mol.atoms.length,mol.bonds.map(b=>[idx.get(b.a),idx.get(b.b)]))
-    .map(r=>r.map(i=>mol.atoms[i].id)).sort((p,q)=>p.length-q.length);
+  const topologySignature=mol.atoms.map(a=>a.id).join(',')+'#'+mol.bonds.map(b=>b.a+','+b.b).join('|');
+  if(topologySignature!==ringTopologySignature){
+    const idx=new Map(mol.atoms.map((a,i)=>[a.id,i]));
+    rings=findRings(mol.atoms.length,mol.bonds.map(b=>[idx.get(b.a),idx.get(b.b)]))
+      .map(r=>r.map(i=>mol.atoms[i].id)).sort((p,q)=>p.length-q.length);
+    ringTopologySignature=topologySignature;
+  }
   updateRingCenters();
 }
 function updateRingCenters(){
@@ -901,9 +906,10 @@ function stats(){
   const f=formulaParts(cnt).map(([el,n])=>escapeMarkup(el)+(n>1?'<sub>'+n+'</sub>':'')).join('')+(q?'<sup>'+(Math.abs(q)>1?Math.abs(q):'')+(q>0?'+':'−')+'</sup>':'');
   return{f,mw};
 }
+/* Chemical identity for metadata and name caching; coordinates and wedge depiction are excluded. */
 function moleculeGraphSignature(){
-  const atoms=mol.atoms.map(a=>a.id+':'+a.el+':'+(a.q||0)+':'+(Number.isInteger(a.hExplicit)?a.hExplicit:'')+':'+(a.stereo?a.stereo.parity+'['+a.stereo.refs.map(x=>x===null?'H':x).join(',')+']':'')).sort().join('|');
-  const bonds=mol.bonds.map(b=>Math.min(b.a,b.b)+'-'+Math.max(b.a,b.b)+':'+b.o+':'+(b.dir||'')+':'+(b.dirFrom||'')+':'+(b.stereoStyle||'')+':'+(b.stereoFrom||'')).sort().join('|');
+  const atoms=mol.atoms.map(a=>a.id+':'+a.el+':'+(a.q||0)+':'+(Number.isInteger(a.hExplicit)?a.hExplicit:'')+':'+(a._valenceWarning?1:0)+':'+(a.stereo?a.stereo.parity+'['+a.stereo.refs.map(x=>x===null?'H':x).join(',')+']':'')).sort().join('|');
+  const bonds=mol.bonds.map(b=>Math.min(b.a,b.b)+'-'+Math.max(b.a,b.b)+':'+b.o+':'+(b.dir||'')+':'+(b.dirFrom||'')).sort().join('|');
   return atoms+'#'+bonds;
 }
 function updateInfo2D(){
@@ -911,16 +917,16 @@ function updateInfo2D(){
     return;
   }
   const s=stats(),bad=mol.atoms.filter(a=>a._valenceWarning).length;
-  const metadata=moleculeMetadata&&moleculeMetadata.signature===moleculeGraphSignature()?moleculeMetadata:null;
+  const signature=moleculeGraphSignature(),metadata=moleculeMetadata&&moleculeMetadata.signature===signature?moleculeMetadata:null;
   let iupac='';
-  try{iupac=currentIUPACName()||'';}catch(_){iupac='';}
+  try{iupac=currentIUPACName(signature)||'';}catch(_){iupac='';}
   const commonName=metadata&&metadata.name?metadata.name:'';
   const nameParts=commonName&&iupac&&norm(commonName)!==norm(iupac)?[commonName,iupac]:[iupac||commonName].filter(Boolean);
   const names=nameParts.length?'<br><span>'+nameParts.map(escapeMarkup).join(' · ')+'</span>':'';
   $('#info2d').innerHTML='<b>'+s.f+'</b> · '+s.mw.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' g/mol'+names+(bad?' · <span style="color:#b42318">⚠ '+bad+' valência(s) fora do modelo automático</span>':'');
 }
 let geomRevision=0,geometryTaskStatus='idle',layoutTaskStatus='idle',layoutTaskId=0;
-function changed(){
+function changed({reindexStructure=true,refreshInfo=true}={}){
   hover=null;
   if(V.vibrating)stopVibrations(true);
   clearTimeout(t3);
@@ -934,12 +940,13 @@ function changed(){
   latest3DRun++;
   geometryTaskStatus='idle';
   geomRevision++;
-  reindex();
+  if(reindexStructure)reindex();
+  else updateRingCenters();
   refreshManualStereoWedges();
   if(!amap.has(keyboardAtomId))keyboardAtomId=mol.atoms[0]?.id??null;
   if(!amap.has(keyboardBondStartId))keyboardBondStartId=null;
   draw2D();
-  updateInfo2D();
+  if(refreshInfo)updateInfo2D();
   schedule3D();
 }
 
@@ -989,7 +996,7 @@ function parseSMILES(s){
       i++;
     }
     else if(c===')'){
-      if(!stack.length)throw new Error('Parêntese sem par');
+      if(!stack.length)throw new Error('Há um ")" sem um "(" correspondente no SMILES.');
       if(po||pendingDir)throw new Error('O ramo termina com uma ligação incompleta.');
       const branch=stack.pop();
       if(atoms.length===branch.atomCount||prev===branch.atom)throw new Error('Ramo vazio no SMILES.');
@@ -1018,7 +1025,7 @@ function parseSMILES(s){
       }else{num=c;
         i++;
       }
-      if(prev<0)throw new Error('Fechamento de anel inválido');
+      if(prev<0)throw new Error('O rótulo de anel "'+num+'" aparece antes de qualquer átomo.');
       if(ring.has(num)){const r=ring.get(num);
         if(r.o&&po)throw new Error('Ordem de ligação de anel especificada duas vezes.');
         if(r.dir&&pendingDir)throw new Error('Direção de ligação de anel especificada duas vezes.');
@@ -1065,12 +1072,12 @@ function parseSMILES(s){
       else if('bcnops'.includes(c)){addA(c.toUpperCase(),0,true,null);
         i++;
       }
-      else throw new Error('Caractere inesperado: '+c);
+      else throw new Error('O caractere "'+c+'" não é um átomo ou operador SMILES reconhecido.');
     }
   }
   if(!atoms.length||prev<0)throw new Error('O SMILES termina com um componente vazio.');
-  if(ring.size)throw new Error('Anel não fechado');
-  if(stack.length)throw new Error('Parêntese não fechado');
+  if(ring.size)throw new Error('Rótulo(s) de anel sem fechamento: '+[...ring.keys()].join(', ')+'. Cada rótulo precisa aparecer em dois átomos.');
+  if(stack.length)throw new Error('Há um "(" sem um ")" correspondente no SMILES.');
   if(po)throw new Error('A estrutura termina com um operador de ligação incompleto.');
   if(pendingDir)throw new Error('Marca de direção sem ligação seguinte.');
   for(const a of atoms)if(a.stereo){const refs=a.stereo.refs;
@@ -3124,10 +3131,10 @@ c2.addEventListener('pointerup',e=>{
   drag=null;
   c2.classList.remove('is-rotating-view');
   if(d.type==='move'){
-    if(d.pushed){clearManualStereoWedgesForAtomMove(d.ha.id);changed();}
+    if(d.pushed){clearManualStereoWedgesForAtomMove(d.ha.id);changed({reindexStructure:false});}
   }else if(d.type==='chain'){
     updateChainDrag(d,sx,sy);
-    if(d.pushed)changed();
+    if(d.pushed)changed({reindexStructure:false});
   }
   else if(d.type==='tool'){d.moved=Math.hypot(sx-d.sx,sy-d.sy)>6;
     onToolUp(d,sx,sy);
@@ -3145,8 +3152,8 @@ const cancel2DPointer=e=>{
   const moved=drag.type==='move'&&drag.pushed,movedAtomId=moved&&drag.ha?drag.ha.id:null,chainChanged=drag.type==='chain'&&drag.pushed;
   drag=null;hover=null;
   c2.classList.remove('is-rotating-view');
-  if(chainChanged)changed();
-  else if(moved){clearManualStereoWedgesForAtomMove(movedAtomId);changed();}
+  if(chainChanged)changed({reindexStructure:false});
+  else if(moved){clearManualStereoWedgesForAtomMove(movedAtomId);changed({reindexStructure:false});}
   draw2D();
 };
 c2.addEventListener('pointercancel',cancel2DPointer);
@@ -4647,17 +4654,15 @@ function loadGraph(g,metadata=null){
     if(b.stereoStyle&&['solid','hashed'].includes(b.stereoStyle)&&Number.isInteger(b.stereoFrom)){t.stereoStyle=b.stereoStyle;t.stereoFrom=ids[b.stereoFrom];}
     mol.bonds.push(t);
   }
-  changed();
+  changed({refreshInfo:false});
   moleculeMetadata=metadata?{...metadata,signature:moleculeGraphSignature()}:null;
   updateInfo2D();
   view.r=0;
   fitView();
   draw2D();
 }
-async function loadSMILES(s,metadata=null){
-  if(typeof s!=='string')throw new Error('O SMILES deve ser texto.');
-  if(s.length>MAX_SEARCH_CHARS)throw new Error('A entrada excede o limite de '+MAX_SEARCH_CHARS+' caracteres.');
-  const g=MoleculeIO.parseSMILES(s),randomSeed=moleculeSeed(g.atoms,g.bonds);
+async function loadParsedSMILESGraph(g,metadata=null){
+  const randomSeed=moleculeSeed(g.atoms,g.bonds);
   const taskId=++layoutTaskId;
   layoutTaskStatus='running';
   cancelPending3DForLayout();
@@ -4669,6 +4674,11 @@ async function loadSMILES(s,metadata=null){
   if(taskId!==layoutTaskId)return;
   layoutTaskStatus='idle';
   loadGraph({atoms:g.atoms.map((a,i)=>({el:a.el,q:a.q,hx:a.hx,stereo:a.stereo,x:pos[i].x,y:pos[i].y})),bonds:g.bonds},metadata);
+}
+async function loadSMILES(s,metadata=null){
+  if(typeof s!=='string')throw new Error('O SMILES deve ser texto.');
+  if(s.length>MAX_SEARCH_CHARS)throw new Error('A entrada excede o limite de '+MAX_SEARCH_CHARS+' caracteres.');
+  return loadParsedSMILESGraph(MoleculeIO.parseSMILES(s),metadata);
 }
 async function cleanUp(){
   if(!mol.atoms.length)return;
@@ -4693,7 +4703,7 @@ async function cleanUp(){
     a.y=pos[i].y;
   });
   clearManualStereoWedges();
-  changed();
+  changed({reindexStructure:false});
   fitView();
   draw2D();
 }
@@ -4710,142 +4720,100 @@ function cancelPending3DForLayout(){
 
 /* ================= Biblioteca interna ================= */
 const LIB=[
-[['água','water','h2o'],'O'],
-[['eteno','etileno','ethylene'],'C=C'],[['propeno','propileno','propene'],'CC=C'],[['propadieno','aleno','allene'],'C=C=C'],[['butadieno','1,3-butadieno','butadiene'],'C=CC=C'],
-[['etino','acetileno','acetylene'],'C#C'],
-[['benzeno','benzene'],'C1=CC=CC=C1'],[['tolueno','toluene'],'CC1=CC=CC=C1'],
-[['fenol','phenol'],'OC1=CC=CC=C1'],[['anilina','aniline'],'NC1=CC=CC=C1'],[['naftaleno','naphthalene'],'C1=CC=C2C=CC=CC2=C1'],
-[['piridina','pyridine'],'C1=CC=NC=C1'],[['indol','indole'],'C1=CC=C2C(=C1)C=CN2'],[['furano','furan'],'C1=COC=C1'],
-[['tiofeno','thiophene'],'C1=CSC=C1'],[['pirrol','pyrrole'],'C1=CNC=C1'],[['tetrahidrofurano','thf'],'C1CCOC1'],
-[['isopropanol','2-propanol'],'CC(C)O'],
-[['etilenoglicol','ethylene glycol'],'OCCO'],[['glicerol','glicerina','glycerol'],'OCC(O)CO'],
-[['formaldeído','formaldehyde'],'C=O'],[['acetaldeído','acetaldehyde'],'CC=O'],[['acetona','acetone'],'CC(C)=O'],
-[['ácido fórmico','formic acid'],'C(=O)O'],[['ácido acético','acetic acid'],'CC(=O)O'],[['acetato de etila','ethyl acetate'],'CCOC(C)=O'],
-[['éter dietílico','diethyl ether'],'CCOCC'],[['ácido benzoico','benzoic acid'],'OC(=O)C1=CC=CC=C1'],
-[['ácido lático','lactic acid'],'CC(O)C(O)=O'],[['ácido cítrico','citric acid'],'O=C(O)CC(O)(CC(=O)O)C(=O)O'],
-[['amônia','ammonia'],'N'],[['metilamina','methylamine'],'CN'],[['trimetilamina','trimethylamine'],'CN(C)C'],
-[['ureia','urea'],'NC(N)=O'],[['glicina','glycine'],'NCC(=O)O'],[['alanina','L-alanina','alanine','L-alanine'],'C[C@H](N)C(=O)O'],
-[['dióxido de carbono','co2','carbon dioxide'],'O=C=O'],[['peróxido de hidrogênio','água oxigenada','hydrogen peroxide'],'OO'],
-[['sulfeto de hidrogênio','hydrogen sulfide'],'S'],[['ácido sulfúrico','sulfuric acid'],'OS(=O)(=O)O'],
-[['ácido nítrico','nitric acid'],'O[N+](=O)[O-]'],[['ácido fosfórico','phosphoric acid'],'OP(O)(O)=O'],
-[['ácido clorídrico','hcl','hydrochloric acid'],'Cl'],[['clorofórmio','chloroform'],'ClC(Cl)Cl'],
-[['dmso','dimetilsulfóxido'],'CS(C)=O'],[['cloreto de sódio','sal de cozinha','sodium chloride','nacl'],'[Na+].[Cl-]'],
-[['adamantano','adamantane'],'C1C2CC3CC1CC(C2)C3'],
-[['aspirina','ácido acetilsalicílico','aspirin'],'CC(=O)OC1=CC=CC=C1C(=O)O'],[['paracetamol','acetaminophen'],'CC(=O)NC1=CC=C(O)C=C1'],
-[['ibuprofeno','ibuprofen'],'CC(C)CC1=CC=C(C=C1)C(C)C(=O)O'],[['cafeína','caffeine'],'CN1C=NC2=C1C(=O)N(C(=O)N2C)C'],
-[['(S)-nicotina','nicotina','nicotine','(S)-nicotine'],'CN1CCC[C@H]1C2=CN=CC=C2'],[['dopamina','dopamine'],'NCCC1=CC(O)=C(O)C=C1'],
-  [['glicose','D-glicose','glucose','D-glucose'],'C([C@@H]1[C@H]([C@@H]([C@H](C(O1)O)O)O)O)O'],
-
-  /* Hidrocarbonetos alifáticos, ramificados e insaturados */
-  [['isobutano','2-metilpropano','isobutane'],'CC(C)C'],
-  [['isopentano','2-metilbutano','isopentane'],'CC(C)CC'],
-  [['neopentano','2,2-dimetilpropano','neopentane'],'CC(C)(C)C'],
-  [['isopreno','isoprene'],'C=C(C)C=C'],
-
-  /* Aromáticos e derivados */
-  [['o-xileno','1,2-dimetilbenzeno','o-xylene'],'Cc1ccccc1C'],
-  [['m-xileno','1,3-dimetilbenzeno','m-xylene'],'Cc1cccc(C)c1'],
-  [['p-xileno','1,4-dimetilbenzeno','p-xylene'],'Cc1ccc(C)cc1'],
-  [['estireno','vinilbenzeno','styrene'],'C=Cc1ccccc1'],
-  [['cumeno','isopropilbenzeno','cumene'],'CC(C)c1ccccc1'],
-  [['benzaldeído','benzaldehyde'],'O=Cc1ccccc1'],
-  [['álcool benzílico','benzyl alcohol'],'OCc1ccccc1'],
-  [['anisol','metoxibenzeno','anisole'],'COc1ccccc1'],
-  [['acetofenona','acetophenone'],'CC(=O)c1ccccc1'],
-  [['fenilacetileno','phenylacetylene'],'C#Cc1ccccc1'],
-  [['bifenila','biphenyl'],'c1ccccc1-c1ccccc1'],
-  [['benzonitrila','benzonitrile'],'N#Cc1ccccc1'],
-  [['cloreto de benzila','benzyl chloride'],'ClCc1ccccc1'],
-  [['o-cresol','2-metilfenol'],'Cc1ccccc1O'],
-  [['m-cresol','3-metilfenol'],'Cc1cccc(O)c1'],
-  [['p-cresol','4-metilfenol'],'Cc1ccc(O)cc1'],
-
-  /* Álcoois, éteres, aldeídos, cetonas, ácidos e derivados */
-  [['terc-butanol','tert-butanol','2-metil-2-propanol'],'CC(C)(C)O'],
-  [['propilenoglicol','1,2-propanodiol','propylene glycol'],'CC(O)CO'],
-  [['éter dimetílico','dimethyl ether'],'COC'],
-  [['éter metil-etílico','methoxyethane','ethyl methyl ether'],'CCOC'],
-  [['1,2-dimetoxietano','dimethoxyethane','glyme'],'COCCOC'],
-  [['1,4-dioxano','dioxane','1,4-dioxane'],'C1COCCO1'],
-  [['formiato de metila','methyl formate'],'COC=O'],
-  [['acetato de metila','methyl acetate'],'COC(C)=O'],
-  [['propionato de metila','methyl propanoate'],'CCC(=O)OC'],
-  [['ácido propiônico','ácido propanoico','propionic acid'],'CCC(=O)O'],
-  [['ácido butírico','ácido butanoico','butyric acid'],'CCCC(=O)O'],
-  [['ácido oxálico','oxalic acid'],'O=C(O)C(=O)O'],
-  [['ácido malônico','malonic acid'],'O=C(O)CC(=O)O'],
-  [['ácido succínico','succinic acid'],'O=C(O)CCC(=O)O'],
-  [['ácido adípico','adipic acid'],'O=C(O)CCCCC(=O)O'],
-  [['ácido salicílico','salicylic acid'],'O=C(O)c1ccccc1O'],
-  [['ácido málico','malic acid'],'O=C(O)CC(O)C(=O)O'],
-  [['ácido pirúvico','pyruvic acid'],'CC(=O)C(=O)O'],
-  [['benzoato de metila','methyl benzoate'],'COC(=O)c1ccccc1'],
-  [['benzoato de etila','ethyl benzoate'],'CCOC(=O)c1ccccc1'],
-  [['salicilato de metila','methyl salicylate'],'COC(=O)c1ccccc1O'],
-  [['formiato de etila','ethyl formate'],'CCOC=O'],
-  [['acetamida','acetamide'],'CC(=O)N'],
-  [['acetanilida','acetanilide'],'CC(=O)Nc1ccccc1'],
-  [['catecol','pirocatecol','catechol'],'Oc1ccccc1O'],
-  [['resorcinol','1,3-dihidroxibenzeno'],'Oc1cccc(O)c1'],
-  [['hidroquinona','1,4-dihidroxibenzeno','hydroquinone'],'Oc1ccc(O)cc1'],
-  [['vanilina','vanillin'],'COc1cc(C=O)ccc1O'],
-
-  /* Compostos nitrogenados, sais e inorgânicos */
-  [['nitrogênio','nitrogen','N2'],'N#N'],
-  [['oxigênio','oxygen','O2'],'O=O'],
-  [['ácido cianídrico','hydrogen cyanide','HCN'],'C#N'],
-  [['acetonitrila','cianeto de metila','acetonitrile'],'CC#N'],
-  [['propionitrila','propanonitrila','propionitrile'],'CCC#N'],
-  [['etilamina','ethylamine'],'CCN'],
-  [['dimetilamina','dimethylamine'],'CNC'],
-  [['dietilamina','diethylamine'],'CCNCC'],
-  [['trietilamina','triethylamine'],'CCN(CC)CC'],
-  [['pirimidina','pyrimidine'],'c1cncnc1'],
-  [['imidazol','imidazole'],'c1ncc[nH]1'],
-  [['íon amônio','amônio','ammonium'],'[NH4+]'],
-  [['íon hidróxido','hidróxido','hydroxide'],'[OH-]'],
-  [['íon hidrônio','hidrônio','hydronium'],'[OH3+]'],
-  [['bicarbonato','íon bicarbonato','bicarbonate'],'O=C([O-])O'],
-  [['carbonato','íon carbonato','carbonate'],'O=C([O-])[O-]'],
-  [['cloreto de amônio','ammonium chloride'],'[NH4+].[Cl-]'],
-  [['brometo de potássio','potassium bromide'],'[K+].[Br-]'],
-  [['bicarbonato de sódio','sodium bicarbonate'],'[Na+].O=C([O-])O'],
-  [['carbonato de cálcio','calcium carbonate'],'[Ca+2].O=C([O-])[O-]'],
-  [['dióxido de enxofre','sulfur dioxide'],'O=S=O'],
-  [['trióxido de enxofre','sulfur trioxide'],'O=S(=O)=O'],
-  [['dissulfeto de carbono','carbon disulfide'],'S=C=S'],
-  [['pentacloreto de fósforo','phosphorus pentachloride'],'ClP(Cl)(Cl)(Cl)Cl'],
-  [['1,2-dicloroetano','1,2-dichloroethane'],'ClCCCl'],
-  [['cloreto de vinila','cloroeteno','vinyl chloride'],'C=CCl'],
-  [['1,2-dibromoetano','1,2-dibromoethane'],'BrCCBr'],
-
-  /* Bioquímica: aminoácidos, açúcares e bases nitrogenadas */
-  [['valina','L-valina','valine','L-valine'],'CC(C)[C@H](N)C(=O)O'],
-  [['isoleucina','L-isoleucina','isoleucine','L-isoleucine'],'CC[C@H](C)[C@@H](C(=O)O)N'],
-  [['treonina','L-treonina','threonine','L-threonine'],'C[C@H]([C@@H](C(=O)O)N)O'],
-  [['serina','L-serina','serine','L-serine'],'N[C@@H](CO)C(=O)O'],
-  [['cisteína','L-cisteína','cysteine','L-cysteine'],'N[C@@H](CS)C(=O)O'],
-  [['metionina','L-metionina','methionine','L-methionine'],'CSCC[C@@H](C(=O)O)N'],
-  [['prolina','L-prolina','proline','L-proline'],'O=C(O)[C@@H]1CCCN1'],
-  [['ácido aspártico','ácido L-aspártico','aspartic acid','L-aspartic acid'],'N[C@@H](CC(=O)O)C(=O)O'],
-  [['ácido glutâmico','ácido L-glutâmico','glutamic acid','L-glutamic acid'],'N[C@@H](CCC(=O)O)C(=O)O'],
-  [['leucina','L-leucina','leucine','L-leucine'],'N[C@@H](CC(C)C)C(=O)O'],
-  [['lisina','L-lisina','lysine','L-lysine'],'N[C@@H](CCCCN)C(=O)O'],
-  [['fenilalanina','L-fenilalanina','phenylalanine','L-phenylalanine'],'N[C@@H](CC1=CC=CC=C1)C(=O)O'],
-  [['tirosina','L-tirosina','tyrosine','L-tyrosine'],'N[C@@H](CC1=CC=C(O)C=C1)C(=O)O'],
-  [['arginina','L-arginina','arginine','L-arginine'],'N[C@@H](CCCNC(N)=N)C(=O)O'],
-  [['histidina','L-histidina','histidine','L-histidine'],'N[C@@H](CC1=CN=CN1)C(=O)O'],
-  [['triptofano','L-triptofano','tryptophan','L-tryptophan'],'C1=CC=C2C(=C1)C(=CN2)C[C@@H](C(=O)O)N'],
-  [['asparagina','L-asparagina','asparagine','L-asparagine'],'C([C@@H](C(=O)O)N)C(=O)N'],
-  [['glutamina','L-glutamina','glutamine','L-glutamine'],'C(CC(=O)N)[C@@H](C(=O)O)N'],
-  [['β-D-fructopiranose','frutose','D-frutose','fructose','D-fructose','beta-D-fructopyranose'],'C1[C@H]([C@H]([C@@H]([C@](O1)(CO)O)O)O)O'],
-  [['β-D-ribofuranose','ribose','D-ribose','beta-D-ribose'],'C([C@@H]1[C@H]([C@H]([C@@H](O1)O)O)O)O'],
-  [['β-D-2-desoxirribofuranose','desoxirribose','2-desoxirribose','deoxyribose','2-deoxyribose','beta-D-2-deoxyribose'],'C1[C@@H]([C@@H](CO)O[C@H]1O)O'],
-  [['uracila','uracil'],'O=C1NC=CC(=O)N1'],
-  [['timina','thymine'],'CC1=CNC(=O)NC1=O'],
-  [['citosina','cytosine'],'NC1=NC(=O)NC=C1'],
-  [['adenina','adenine'],'NC1=NC=NC2=C1N=CN2'],
-  [['guanina','guanine'],'NC1=NC2=C(N=CN2)C(=O)N1']
+  /* Substâncias inorgânicas, íons e sais */
+  [["ácido cianídrico","hydrogen cyanide","HCN"],"C#N"],
+  [["ácido clorídrico","hcl","hydrochloric acid"],"Cl"],
+  [["ácido fosfórico","phosphoric acid"],"OP(O)(O)=O"],
+  [["ácido nítrico","nitric acid"],"O[N+](=O)[O-]"],
+  [["ácido sulfúrico","sulfuric acid"],"OS(=O)(=O)O"],
+  [["água","water","h2o"],"O"],
+  [["amônia","ammonia"],"N"],
+  [["bicarbonato","íon bicarbonato","bicarbonate"],"O=C([O-])O"],
+  [["bicarbonato de sódio","sodium bicarbonate"],"[Na+].O=C([O-])O"],
+  [["brometo de potássio","potassium bromide"],"[K+].[Br-]"],
+  [["carbonato","íon carbonato","carbonate"],"O=C([O-])[O-]"],
+  [["carbonato de cálcio","calcium carbonate"],"[Ca+2].O=C([O-])[O-]"],
+  [["cloreto de amônio","ammonium chloride"],"[NH4+].[Cl-]"],
+  [["cloreto de sódio","sal de cozinha","sodium chloride","nacl"],"[Na+].[Cl-]"],
+  [["dióxido de carbono","co2","carbon dioxide"],"O=C=O"],
+  [["dióxido de enxofre","sulfur dioxide"],"O=S=O"],
+  [["dissulfeto de carbono","carbon disulfide"],"S=C=S"],
+  [["íon amônio","amônio","ammonium"],"[NH4+]"],
+  [["íon hidrônio","hidrônio","hydronium"],"[OH3+]"],
+  [["íon hidróxido","hidróxido","hydroxide"],"[OH-]"],
+  [["nitrogênio","nitrogen","N2"],"N#N"],
+  [["oxigênio","oxygen","O2"],"O=O"],
+  [["pentacloreto de fósforo","phosphorus pentachloride"],"ClP(Cl)(Cl)(Cl)Cl"],
+  [["peróxido de hidrogênio","água oxigenada","hydrogen peroxide"],"OO"],
+  [["sulfeto de hidrogênio","hydrogen sulfide"],"S"],
+  [["trióxido de enxofre","sulfur trioxide"],"O=S(=O)=O"],
+  /* Hidrocarbonetos e derivados aromáticos */
+  [["acetanilida","acetanilide"],"CC(=O)Nc1ccccc1"],
+  [["acetofenona","acetophenone"],"CC(=O)c1ccccc1"],
+  [["adamantano","adamantane"],"C1C2CC3CC1CC(C2)C3"],
+  [["benzonitrila","benzonitrile"],"N#Cc1ccccc1"],
+  [["bifenila","biphenyl"],"c1ccccc1-c1ccccc1"],
+  [["catecol","pirocatecol","catechol"],"Oc1ccccc1O"],
+  [["cloreto de benzila","benzyl chloride"],"ClCc1ccccc1"],
+  [["estireno","vinilbenzeno","styrene"],"C=Cc1ccccc1"],
+  [["fenilacetileno","phenylacetylene"],"C#Cc1ccccc1"],
+  [["m-cresol","3-metilfenol"],"Cc1cccc(O)c1"],
+  [["naftaleno","naphthalene"],"C1=CC=C2C=CC=CC2=C1"],
+  [["o-cresol","2-metilfenol"],"Cc1ccccc1O"],
+  [["p-cresol","4-metilfenol"],"Cc1ccc(O)cc1"],
+  /* Heterociclos */
+  [["1,4-dioxano","dioxane","1,4-dioxane"],"C1COCCO1"],
+  [["furano","furan"],"C1=COC=C1"],
+  [["imidazol","imidazole"],"c1ncc[nH]1"],
+  [["indol","indole"],"C1=CC=C2C(=C1)C=CN2"],
+  [["piridina","pyridine"],"C1=CC=NC=C1"],
+  [["pirimidina","pyrimidine"],"c1cncnc1"],
+  [["pirrol","pyrrole"],"C1=CNC=C1"],
+  [["tiofeno","thiophene"],"C1=CSC=C1"],
+  /* Compostos oxigenados, sulfurados e ácidos carboxílicos */
+  [["ácido adípico","adipic acid"],"O=C(O)CCCCC(=O)O"],
+  [["ácido cítrico","citric acid"],"O=C(O)CC(O)(CC(=O)O)C(=O)O"],
+  [["ácido málico","malic acid"],"O=C(O)CC(O)C(=O)O"],
+  [["ácido malônico","malonic acid"],"O=C(O)CC(=O)O"],
+  [["ácido oxálico","oxalic acid"],"O=C(O)C(=O)O"],
+  [["ácido succínico","succinic acid"],"O=C(O)CCC(=O)O"],
+  [["dmso","dimetilsulfóxido"],"CS(C)=O"],
+  /* Fármacos e moléculas bioativas */
+  [["(S)-nicotina","nicotina","nicotine","(S)-nicotine"],"CN1CCC[C@H]1C2=CN=CC=C2"],
+  [["aspirina","ácido acetilsalicílico","aspirin"],"CC(=O)OC1=CC=CC=C1C(=O)O"],
+  [["cafeína","caffeine"],"CN1C=NC2=C1C(=O)N(C(=O)N2C)C"],
+  [["dopamina","dopamine"],"NCCC1=CC(O)=C(O)C=C1"],
+  [["ibuprofeno","ibuprofen"],"CC(C)CC1=CC=C(C=C1)C(C)C(=O)O"],
+  [["paracetamol","acetaminophen"],"CC(=O)NC1=CC=C(O)C=C1"],
+  /* Biomoléculas: aminoácidos, açúcares e bases nitrogenadas */
+  [["ácido aspártico","ácido L-aspártico","aspartic acid","L-aspartic acid"],"N[C@@H](CC(=O)O)C(=O)O"],
+  [["ácido glutâmico","ácido L-glutâmico","glutamic acid","L-glutamic acid"],"N[C@@H](CCC(=O)O)C(=O)O"],
+  [["adenina","adenine"],"NC1=NC=NC2=C1N=CN2"],
+  [["arginina","L-arginina","arginine","L-arginine"],"N[C@@H](CCCNC(N)=N)C(=O)O"],
+  [["asparagina","L-asparagina","asparagine","L-asparagine"],"C([C@@H](C(=O)O)N)C(=O)N"],
+  [["cisteína","L-cisteína","cysteine","L-cysteine"],"N[C@@H](CS)C(=O)O"],
+  [["citosina","cytosine"],"NC1=NC(=O)NC=C1"],
+  [["fenilalanina","L-fenilalanina","phenylalanine","L-phenylalanine"],"N[C@@H](CC1=CC=CC=C1)C(=O)O"],
+  [["glicose","D-glicose","glucose","D-glucose"],"C([C@@H]1[C@H]([C@@H]([C@H](C(O1)O)O)O)O)O"],
+  [["glutamina","L-glutamina","glutamine","L-glutamine"],"C(CC(=O)N)[C@@H](C(=O)O)N"],
+  [["guanina","guanine"],"NC1=NC2=C(N=CN2)C(=O)N1"],
+  [["histidina","L-histidina","histidine","L-histidine"],"N[C@@H](CC1=CN=CN1)C(=O)O"],
+  [["isoleucina","L-isoleucina","isoleucine","L-isoleucine"],"CC[C@H](C)[C@@H](C(=O)O)N"],
+  [["leucina","L-leucina","leucine","L-leucine"],"N[C@@H](CC(C)C)C(=O)O"],
+  [["lisina","L-lisina","lysine","L-lysine"],"N[C@@H](CCCCN)C(=O)O"],
+  [["metionina","L-metionina","methionine","L-methionine"],"CSCC[C@@H](C(=O)O)N"],
+  [["prolina","L-prolina","proline","L-proline"],"O=C(O)[C@@H]1CCCN1"],
+  [["serina","L-serina","serine","L-serine"],"N[C@@H](CO)C(=O)O"],
+  [["timina","thymine"],"CC1=CNC(=O)NC1=O"],
+  [["tirosina","L-tirosina","tyrosine","L-tyrosine"],"N[C@@H](CC1=CC=C(O)C=C1)C(=O)O"],
+  [["treonina","L-treonina","threonine","L-threonine"],"C[C@H]([C@@H](C(=O)O)N)O"],
+  [["triptofano","L-triptofano","tryptophan","L-tryptophan"],"C1=CC=C2C(=C1)C(=CN2)C[C@@H](C(=O)O)N"],
+  [["uracila","uracil"],"O=C1NC=CC(=O)N1"],
+  [["ureia","urea"],"NC(N)=O"],
+  [["valina","L-valina","valine","L-valine"],"CC(C)[C@H](N)C(=O)O"],
+  [["β-D-2-desoxirribofuranose","desoxirribose","2-desoxirribose","deoxyribose","2-deoxyribose","beta-D-2-deoxyribose"],"C1[C@@H]([C@@H](CO)O[C@H]1O)O"],
+  [["β-D-fructopiranose","frutose","D-frutose","fructose","D-fructose","beta-D-fructopyranose"],"C1[C@H]([C@H]([C@@H]([C@](O1)(CO)O)O)O)O"],
+  [["β-D-ribofuranose","ribose","D-ribose","beta-D-ribose"],"C([C@@H]1[C@H]([C@H]([C@@H](O1)O)O)O)O"],
 ];
 const IUPAC_NAMES=Object.freeze({
   agua:'oxidano',propeno:'prop-1-eno',propadieno:'propa-1,2-dieno',butadieno:'buta-1,3-dieno',
@@ -4899,17 +4867,112 @@ const IUPAC_NAMES=Object.freeze({
   'dissulfeto de carbono':'dissulfeto de carbono','pentacloreto de fosforo':'pentacloreto de fósforo',
     'tetracloreto de carbono':'tetraclorometano','cloreto de vinila':'cloroeteno'
 });
-const searchNames=[...new Set(LIB.flatMap(m=>[m[0][0],IUPAC_NAMES[norm(m[0][0])]].filter(Boolean)))];
+const LIB_ALIASES=Object.freeze([
+  /* Sinônimos cujas estruturas o parser IUPAC atual já reconstrói. */
+  [["1,2-dibromoetano","1,2-dibromoethane"],"1,2-dibromoetano"],
+  [["1,2-dicloroetano","1,2-dichloroethane"],"1,2-dicloroetano"],
+  [["1,2-dimetoxietano","dimethoxyethane","glyme"],"1,2-dimetoxietano"],
+  [["acetaldeído","acetaldehyde"],"etanal"],
+  [["acetamida","acetamide"],"etanamida"],
+  [["acetato de etila","ethyl acetate"],"etanoato de etila"],
+  [["acetato de metila","methyl acetate"],"etanoato de metila"],
+  [["acetona","acetone"],"propan-2-ona"],
+  [["acetonitrila","cianeto de metila","acetonitrile"],"etanonitrila"],
+  [["ácido acético","acetic acid"],"ácido etanoico"],
+  [["ácido benzoico","benzoic acid"],"ácido benzoico"],
+  [["ácido butírico","ácido butanoico","butyric acid"],"ácido butanoico"],
+  [["ácido fórmico","formic acid"],"ácido metanoico"],
+  [["ácido lático","lactic acid"],"ácido 2-hidroxipropanoico"],
+  [["ácido pirúvico","pyruvic acid"],"ácido 2-oxopropanoico"],
+  [["ácido propiônico","ácido propanoico","propionic acid"],"ácido propanoico"],
+  [["ácido salicílico","salicylic acid"],"ácido 2-hidroxibenzoico"],
+  [["alanina","L-alanina","alanine","L-alanine"],"ácido (2S)-2-aminopropanoico"],
+  [["álcool benzílico","benzyl alcohol"],"fenilmetanol"],
+  [["anilina","aniline"],"benzenamina"],
+  [["anisol","metoxibenzeno","anisole"],"metoxibenzeno"],
+  [["benzaldeído","benzaldehyde"],"benzaldeído"],
+  [["benzeno","benzene"],"benzeno"],
+  [["benzoato de etila","ethyl benzoate"],"benzoato de etila"],
+  [["benzoato de metila","methyl benzoate"],"benzoato de metila"],
+  [["butadieno","1,3-butadieno","butadiene"],"buta-1,3-dieno"],
+  [["cloreto de vinila","cloroeteno","vinyl chloride"],"cloroeteno"],
+  [["clorofórmio","chloroform"],"triclorometano"],
+  [["cumeno","isopropilbenzeno","cumene"],"propan-2-ilbenzeno"],
+  [["dietilamina","diethylamine"],"N-etiletanamina"],
+  [["dimetilamina","dimethylamine"],"N-metilmetanamina"],
+  [["eteno","etileno","ethylene"],"eteno"],
+  [["éter dietílico","diethyl ether"],"etoxietano"],
+  [["éter dimetílico","dimethyl ether"],"metoximetano"],
+  [["éter metil-etílico","methoxyethane","ethyl methyl ether"],"metoxietano"],
+  [["etilamina","ethylamine"],"etanamina"],
+  [["etilenoglicol","ethylene glycol"],"etano-1,2-diol"],
+  [["etino","acetileno","acetylene"],"etino"],
+  [["fenol","phenol"],"fenol"],
+  [["formaldeído","formaldehyde"],"metanal"],
+  [["formiato de etila","ethyl formate"],"metanoato de etila"],
+  [["formiato de metila","methyl formate"],"metanoato de metila"],
+  [["glicerol","glicerina","glycerol"],"propano-1,2,3-triol"],
+  [["glicina","glycine"],"ácido 2-aminoetanoico"],
+  [["hidroquinona","1,4-dihidroxibenzeno","hydroquinone"],"1,4-dihidroxibenzeno"],
+  [["isobutano","2-metilpropano","isobutane"],"2-metilpropano"],
+  [["isopentano","2-metilbutano","isopentane"],"2-metilbutano"],
+  [["isopreno","isoprene"],"2-metilbuta-1,3-dieno"],
+  [["isopropanol","2-propanol"],"propan-2-ol"],
+  [["m-xileno","1,3-dimetilbenzeno","m-xylene"],"1,3-dimetilbenzeno"],
+  [["metilamina","methylamine"],"metanamina"],
+  [["neopentano","2,2-dimetilpropano","neopentane"],"2,2-dimetilpropano"],
+  [["o-xileno","1,2-dimetilbenzeno","o-xylene"],"1,2-dimetilbenzeno"],
+  [["p-xileno","1,4-dimetilbenzeno","p-xylene"],"1,4-dimetilbenzeno"],
+  [["propadieno","aleno","allene"],"propa-1,2-dieno"],
+  [["propeno","propileno","propene"],"prop-1-eno"],
+  [["propilenoglicol","1,2-propanodiol","propylene glycol"],"propano-1,2-diol"],
+  [["propionato de metila","methyl propanoate"],"propanoato de metila"],
+  [["propionitrila","propanonitrila","propionitrile"],"propanonitrila"],
+  [["resorcinol","1,3-dihidroxibenzeno"],"1,3-dihidroxibenzeno"],
+  [["salicilato de metila","methyl salicylate"],"2-hidroxibenzoato de metila"],
+  [["terc-butanol","tert-butanol","2-metil-2-propanol"],"2-metilpropan-2-ol"],
+  [["tetrahidrofurano","thf"],"oxolano"],
+  [["tolueno","toluene"],"metilbenzeno"],
+  [["trietilamina","triethylamine"],"N,N-dietiletanamina"],
+  [["trimetilamina","trimethylamine"],"N,N-dimetilmetanamina"],
+  [["vanilina","vanillin"],"4-hidroxi-3-metoxibenzaldeído"],
+]);
+const NAME_TO_IUPAC=Object.freeze(Object.fromEntries([
+  ...Object.entries(IUPAC_NAMES),
+  ...LIB_ALIASES.flatMap(([aliases,iupac])=>aliases.map(alias=>[norm(alias),iupac]))
+]));
+function isSmilesTokenSequence(text){
+  const value=text.trim();
+  if(!value)return false;
+  for(let i=0;i<value.length;){
+    const c=value[i];
+    if(c==='['){const end=value.indexOf(']',i+1);if(end<0)return true;i=end+1;continue;}
+    if(value.startsWith('Cl',i)||value.startsWith('Br',i)){i+=2;continue;}
+    if('BCNOPSFIbcnops'.includes(c)||/[0-9]/.test(c)||'%-=#:()./\\@+'.includes(c)){i++;continue;}
+    return false;
+  }
+  return true;
+}
+const searchNames=[...new Set([...LIB.flatMap(m=>m[0]),...LIB_ALIASES.flatMap(([aliases])=>aliases),...Object.values(NAME_TO_IUPAC)])];
 $('#molList').innerHTML=searchNames.map(name=>`<option value="${escapeMarkup(name)}">`).join('');
 function searchMol(q){
   if(q.length>MAX_SEARCH_CHARS){toast('A busca excede o limite de '+MAX_SEARCH_CHARS+' caracteres.');return;}
   const nq=norm(q);
   if(!nq)return;
-  const iupac=m=>norm(IUPAC_NAMES[norm(m[0][0])]||'');
+  const iupac=m=>norm(NAME_TO_IUPAC[norm(m[0][0])]||'');
   const hit=LIB.find(m=>m[0].some(x=>norm(x)===nq))||LIB.find(m=>iupac(m)===nq);
-  if(hit){const name=hit[0][0],iupac=IUPAC_NAMES[norm(name)]||'';
+  if(hit){const name=hit[0][0],iupac=NAME_TO_IUPAC[norm(name)]||'';
     loadSMILES(hit[1],{name,iupac}).catch(e=>{if(!e.cancelled)toast('Não foi possível carregar a molécula ('+e.message+')');});
     return;
+  }
+  const mappedIUPAC=NAME_TO_IUPAC[nq];
+  if(mappedIUPAC){
+    let mappedGraph=null;
+    try{mappedGraph=parseIUPACName(mappedIUPAC);}catch(error){mappedGraph=null;}
+    if(mappedGraph){
+      loadNamedGraph(mappedGraph,{name:q.trim(),iupac:mappedIUPAC,source:'parsed-name'}).catch(e=>{if(!e.cancelled)toast('Não foi possível interpretar esse nome ('+e.message+')');});
+      return;
+    }
   }
   let named;
   try{named=parseIUPACName(q);}catch(error){toast('Nome IUPAC inválido: '+error.message);return;}
@@ -4917,21 +4980,36 @@ function searchMol(q){
     loadNamedGraph(named,{name:q.trim(),iupac:q.trim(),source:'parsed-name'}).catch(e=>{if(!e.cancelled)toast('Não foi possível interpretar esse nome ('+e.message+')');});
     return;
   }
-  let smilesError=null;
-  try{MoleculeIO.parseSMILES(q);}catch(error){smilesError=error;}
-  if(!smilesError){
-    loadSMILES(q).catch(e=>{if(!e.cancelled)toast('Não foi possível carregar esse SMILES ('+e.message+')');});
+  let parsedSMILES=null,smilesError=null;
+  try{parsedSMILES=MoleculeIO.parseSMILES(q);}catch(error){smilesError=error;}
+  if(parsedSMILES){
+    loadParsedSMILESGraph(parsedSMILES).catch(e=>{if(!e.cancelled)toast('Não foi possível carregar esse SMILES ('+e.message+')');});
     return;
   }
   const findPartial=match=>LIB.find(m=>m[0].some(x=>match(norm(x)))||match(iupac(m)));
   const partialHit=nq.length>=3?(findPartial(name=>name.startsWith(nq))||findPartial(name=>name.includes(nq))):null;
-  if(partialHit){const name=partialHit[0][0],iupac=IUPAC_NAMES[norm(name)]||'';
+  if(partialHit){const name=partialHit[0][0],iupac=NAME_TO_IUPAC[norm(name)]||'';
     toast('Mostrando resultado aproximado: '+name+'.');
     loadSMILES(partialHit[1],{name,iupac}).catch(e=>{if(!e.cancelled)toast('Não foi possível carregar a molécula ('+e.message+')');});
     return;
   }
+  const partialAliasHit=nq.length>=3?LIB_ALIASES.find(([aliases,iupac])=>{
+    const names=[...aliases,iupac].map(norm);
+    return names.some(name=>name.startsWith(nq))||names.some(name=>name.includes(nq));
+  }):null;
+  if(partialAliasHit){
+    const [aliases,iupac]=partialAliasHit,name=aliases[0];
+    let aliasGraph=null;
+    try{aliasGraph=parseIUPACName(iupac);}catch(error){aliasGraph=null;}
+    if(aliasGraph){
+      toast('Mostrando resultado aproximado: '+name+'.');
+      loadNamedGraph(aliasGraph,{name,iupac,source:'parsed-name'}).catch(e=>{if(!e.cancelled)toast('Não foi possível interpretar esse nome ('+e.message+')');});
+      return;
+    }
+  }
   if(nq.length<3){toast('A busca parcial exige pelo menos 3 caracteres; nenhum resultado exato foi encontrado.');return;}
-  toast('Nome IUPAC não reconhecido ou SMILES inválido ('+smilesError.message+')');
+  if(isSmilesTokenSequence(q))toast('SMILES inválido: '+smilesError.message);
+  else toast('“'+q.trim()+'” não foi reconhecido como nome IUPAC nem como SMILES. Confira a raiz, os locantes e o sufixo do nome, ou informe um SMILES como CCO.');
 }
 
 /* ================= Nomenclatura IUPAC local =================
@@ -4946,8 +5024,28 @@ const IUPAC_PREFIXES={
   sulfanil:'sulfanil',sulfanyl:'sulfanil',sulfinil:'sulfinil',sulfinyl:'sulfinil',sulfonil:'sulfonil',sulfonyl:'sulfonil',sulfo:'sulfo',sulfino:'sulfino',
   imino:'imino',phosphono:'fosfono',fosfono:'fosfono',nitro:'nitro',acetamido:'acetamido',fenil:'fenil',phenyl:'fenil'
 };
+const IUPAC_AMINO_PREFIXES=Object.create(null);
+const IUPAC_AZANILILIDENO_PREFIXES=Object.create(null);
 const IUPAC_ALKOXY_PREFIXES=Object.create(null);
 const IUPAC_SULFUR_SUBSTITUENTS=Object.create(null);
+function composeAminoPrefixName(alkylNames){
+  const groups=alkylNames.slice().sort(comparePrefixNames),same=groups.every(name=>name===groups[0]);
+  const simple=groups.every(name=>name==='metil'||name==='etil');
+  return groups.length===1?groups[0]+'amino':same?(simple?'di'+groups[0]+'amino':'bis('+groups[0]+')amino'):groups.join('')+'amino';
+}
+function registerAminoPrefix(alkylNames){
+  const groups=alkylNames.slice().sort(comparePrefixNames),name=composeAminoPrefixName(groups);
+  IUPAC_AMINO_PREFIXES[name]=groups;
+  IUPAC_PREFIXES[name.replace(/[^a-z0-9]/g,'')]=name;
+  return name;
+}
+function registerAzanililidenoPrefix(alkylName){
+  if(!alkylName)return null;
+  const name=alkylName+'azanililideno';
+  IUPAC_AZANILILIDENO_PREFIXES[name]=alkylName;
+  IUPAC_PREFIXES[name.replace(/[^a-z0-9]/g,'')]=name;
+  return name;
+}
 function alkoxyPrefixName(length,attachment){
   const stem=IUPAC_STEMS[length];if(!stem||!Number.isInteger(attachment)||attachment<1||attachment>length)return null;
   return length===1?'metoxi':length===2?'etoxi':attachment===1?stem+'oxi':stem+'an-'+attachment+'-iloxi';
@@ -4983,14 +5081,45 @@ for(const[lengthText,stem]of Object.entries(IUPAC_STEMS)){
     }
   }
 }
+const IUPAC_AMINO_ALKYL_GROUPS=['metil','etil',...Object.keys(IUPAC_ALKYL_PREFIXES).filter(name=>name!=='metan-1-il'&&name!=='etan-1-il')];
+for(const name of IUPAC_AMINO_ALKYL_GROUPS)registerAminoPrefix([name]);
+for(const left of ['metil','etil'])for(const right of ['metil','etil'])if(comparePrefixNames(left,right)<=0)registerAminoPrefix([left,right]);
+function aminoPrefixGroupsFromName(name){
+  if(!name.endsWith('amino'))return null;
+  for(const group of IUPAC_AMINO_ALKYL_GROUPS)if(composeAminoPrefixName([group])===name)return[group];
+  for(let i=0;i<IUPAC_AMINO_ALKYL_GROUPS.length;i++)for(let j=i;j<IUPAC_AMINO_ALKYL_GROUPS.length;j++){
+    const groups=[IUPAC_AMINO_ALKYL_GROUPS[i],IUPAC_AMINO_ALKYL_GROUPS[j]];
+    if(composeAminoPrefixName(groups)===name)return groups;
+  }
+  return null;
+}
 const IUPAC_PREFIX_TOKENS=Object.keys(IUPAC_PREFIXES).sort((a,b)=>b.length-a.length).join('|');
 function parsePrefixNames(raw,allowUnlocated=false){
   const complexNames=new Map();
-  const source=raw.replace(/(\d+(?:,\d+)*?)-\((\d+)-(hidroxi|hydroxy|metoxi|methoxy|bromo|cloro|chloro|fluoro|iodo)-?(?:fenil|phenyl)\)/gi,(whole,outer,inner,group)=>{
+  let source=raw.replace(/(\d+(?:,\d+)*?)-\((\d+)-(hidroxi|hydroxy|metoxi|methoxy|bromo|cloro|chloro|fluoro|iodo)-?(?:fenil|phenyl)\)/gi,(whole,outer,inner,group)=>{
     const token='zzcomplex'+complexNames.size+'zz',canonical=group.toLowerCase().replace('hydroxy','hidroxi').replace('methoxy','metoxi').replace('chloro','cloro');
     complexNames.set(token,inner+'-'+canonical+'fenil');return outer+'-'+token;
   });
-  let s=source.replace(/-/g,'').trim();
+  const aminoSpans=[];
+  for(let start=0;start<source.length;start++)if(source[start]==='('){
+    let depth=1,end=start+1;
+    for(;end<source.length&&depth;end++){if(source[end]==='(')depth++;else if(source[end]===')')depth--;}
+    if(depth)continue;
+    const close=end-1,groups=aminoPrefixGroupsFromName(source.slice(start+1,close));
+    if(groups)aminoSpans.push({start,close,groups});
+  }
+  for(const span of aminoSpans.reverse()){
+    const token='zzcomplex'+complexNames.size+'zz';
+    complexNames.set(token,registerAminoPrefix(span.groups));
+    source=source.slice(0,span.start+1)+token+source.slice(span.close);
+  }
+  source=source.replace(/-/g,'');
+  const aminoNames=Object.keys(IUPAC_AMINO_PREFIXES).sort((a,b)=>b.replace(/[^a-z0-9]/g,'').length-a.replace(/[^a-z0-9]/g,'').length);
+  for(const name of aminoNames){
+    const token='zzcomplex'+complexNames.size+'zz',literal=name.replace(/-/g,'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    if(new RegExp(literal).test(source)){complexNames.set(token,name);source=source.replace(new RegExp(literal,'g'),token);}
+  }
+  let s=source.trim();
   if(!s)return[];
   let depth=0;for(const ch of s){if(ch==='('){if(depth)return null;depth++;}else if(ch===')'){if(!depth)return null;depth--;}}if(depth)return null;
   const tokens=[...Object.keys(IUPAC_PREFIXES),...complexNames.keys()].sort((a,b)=>b.length-a.length).join('|');
@@ -5136,6 +5265,16 @@ function addNamedPrefix(g,at,name){
   if(name==='acetamido'){
     const n=addNameAtom(g,'N'),carbonyl=addNameAtom(g,'C'),oxo=addNameAtom(g,'O'),methyl=addNameAtom(g,'C');
     addNameBond(g,at,n);addNameBond(g,n,carbonyl);addNameBond(g,carbonyl,oxo,2);addNameBond(g,carbonyl,methyl);return;
+  }
+  if(IUPAC_AMINO_PREFIXES[name]){
+    const nitrogen=addNameAtom(g,'N');addNameBond(g,at,nitrogen);
+    for(const alkylName of IUPAC_AMINO_PREFIXES[name])addNamedPrefix(g,nitrogen,alkylName);
+    return;
+  }
+  if(IUPAC_AZANILILIDENO_PREFIXES[name]){
+    const nitrogen=addNameAtom(g,'N');addNameBond(g,at,nitrogen,2);
+    addNamedPrefix(g,nitrogen,IUPAC_AZANILILIDENO_PREFIXES[name]);
+    return;
   }
   const alkyl=IUPAC_ALKYL_PREFIXES[name];
   if(alkyl){const chain=Array.from({length:alkyl.length},()=>addNameAtom(g,'C'));
@@ -5990,7 +6129,7 @@ function nameStructureIUPACCandidate(input=mol){
   const allCs=heavy.filter(i=>atoms[i].el==='C');if(!allCs.length||allCs.length>40)return null;
   let cs=allCs,cset=new Set(cs),cadj=new Map(cs.map(i=>[i,[]])),cedges=[];
   for(const e of edges)if(cset.has(e.a)&&cset.has(e.c)){cadj.get(e.a).push({i:e.c,o:e.o});cadj.get(e.c).push({i:e.a,o:e.o});cedges.push(e);}
-  const dblOs=[],amideNs=[],nitrileNs=[],thiolGroups=[],sulfurAcids=[],phosphonicAcids=[],imineGroups=[];
+  const dblOs=[],nitrileNs=[],thiolGroups=[],sulfurAcids=[],phosphonicAcids=[],imineGroups=[];
   for(const c of cs){const ns=adj[c],heavyNs=ns.filter(e=>atoms[e.i].el!=='H');
     const dbO=ns.filter(e=>atoms[e.i].el==='O'&&e.o>=1.75),allSingleO=ns.filter(e=>atoms[e.i].el==='O'&&e.o<1.75);
     const singleO=allSingleO.filter(e=>adj[e.i].filter(x=>atoms[x.i].el!=='H').length===1),nSingle=ns.filter(e=>atoms[e.i].el==='N'&&e.o<1.75),nTriple=ns.filter(e=>atoms[e.i].el==='N'&&e.o>=2.75),halides=heavyNs.filter(e=>['F','Cl','Br','I'].includes(atoms[e.i].el)&&e.o===1);
@@ -6003,7 +6142,6 @@ function nameStructureIUPACCandidate(input=mol){
       const isKetone=dbO.length===1&&!allSingleO.length&&!nSingle.length&&carbonCount>=2&&heavyNs.length===carbonCount+1;
       const isAcidHalide=dbO.length===1&&!allSingleO.length&&!nSingle.length&&halides.length===1&&carbonCount<=1&&heavyNs.length===carbonCount+2;
       dblOs.push({c,ox:dbO.map(e=>e.i),singleO:singleO.map(e=>e.i),allSingleO:allSingleO.map(e=>e.i),esterO:esterO.map(e=>e.i),nSingle:nSingle.map(e=>e.i),halides:halides.map(e=>e.i),carbonCount,isAcid,isEster,isAmide,isAldehyde,isKetone,isAcidHalide});}
-    if(nSingle.length)amideNs.push({c,ns:nSingle.map(e=>e.i)});
     if(nTriple.length)nitrileNs.push({c,ns:nTriple.map(e=>e.i)});
     for(const edge of ns.filter(e=>atoms[e.i].el==='N'&&e.o>=1.75)){
       const nitrogenNeighbors=adj[edge.i].filter(x=>atoms[x.i].el!=='H');
@@ -6038,10 +6176,11 @@ function nameStructureIUPACCandidate(input=mol){
     for(const e of edges)if(cset.has(e.a)&&cset.has(e.c)){cadj.get(e.a).push({i:e.c,o:e.o});cadj.get(e.c).push({i:e.a,o:e.o});cedges.push(e);}
   }
   const oh=[];for(const i of heavy)if(atoms[i].el==='O'&&adj[i].some(e=>atoms[e.i].el==='C'&&e.o===1)&&adj[i].filter(e=>atoms[e.i].el!=='H').length===1)oh.push(adj[i].find(e=>atoms[e.i].el==='C').i);
+  const amideNitrogens=new Set(dblOs.filter(group=>group.isAmide).flatMap(group=>group.nSingle));
   const amineGroups=[];
   for(const nitrogen of heavy)if(atoms[nitrogen].el==='N'&&(atoms[nitrogen].q||0)===0){
     const neighbors=adj[nitrogen].filter(e=>atoms[e.i].el!=='H');
-    if(neighbors.length<1||neighbors.length>3||neighbors.some(e=>atoms[e.i].el!=='C'||e.o!==1)||amideNs.some(x=>x.ns.includes(nitrogen))||nitrileNs.some(x=>x.ns.includes(nitrogen)))continue;
+    if(neighbors.length<1||neighbors.length>3||neighbors.some(e=>atoms[e.i].el!=='C'||e.o!==1)||amideNitrogens.has(nitrogen)||nitrileNs.some(x=>x.ns.includes(nitrogen)))continue;
     amineGroups.push({nitrogen,roots:neighbors.map(e=>e.i)});
   }
   let amines=amineGroups.filter(group=>group.roots.length===1).map(group=>group.roots[0]),principalAmine=null;
@@ -6096,6 +6235,25 @@ function nameStructureIUPACCandidate(input=mol){
     }
   }
   const auxiliaryCarbons=new Set([...esterAuxCarbons,...etherAuxCarbons]),secondaryAmideCarbonyls=new Set();
+  const aminePriority=IUPAC_FUNCTIONAL_GROUP_SENIORITY.indexOf('amine');
+  if(kind&&centers.length&&IUPAC_FUNCTIONAL_GROUP_SENIORITY.indexOf(kind)<aminePriority){
+    const{componentOf}=carbonSkeletonComponents(cs,adj,atoms),principalComponents=new Set(centers.map(center=>componentOf.get(center)));
+    if(principalComponents.size===1&&!principalComponents.has(undefined)){
+      const principalComponent=principalComponents.values().next().value;
+      const addDetachedAlkylRoots=(roots,blocked)=>{
+        const sideRoots=roots.map(root=>({root,component:componentOf.get(root)}));
+        if(!sideRoots.length||sideRoots.some((item,index)=>!item.component||item.component===principalComponent||sideRoots.slice(0,index).some(previous=>previous.component===item.component)))return;
+        if(sideRoots.some(item=>!describeAlkyl(item.root,new Set([blocked]),adj,atoms)))return;
+        for(const item of sideRoots)for(const carbon of collectAlkylAtoms(item.root,new Set([blocked]),adj,atoms))auxiliaryCarbons.add(carbon);
+      };
+      for(const group of amineGroups){
+        const parentRoots=group.roots.filter(root=>componentOf.get(root)===principalComponent);
+        if(parentRoots.length===1)addDetachedAlkylRoots(group.roots.filter(root=>root!==parentRoots[0]),group.nitrogen);
+      }
+      for(const group of imineGroups)if(componentOf.get(group.c)===principalComponent&&group.nSubRoots.length===1)
+        addDetachedAlkylRoots(group.nSubRoots,group.n);
+    }
+  }
   if(kind==='amine'&&principalAmine)for(const i of principalAmine.auxiliaryCarbons)auxiliaryCarbons.add(i);
   if(kind==='imine'&&principalImine)for(const i of principalImine.auxiliaryCarbons)auxiliaryCarbons.add(i);
   for(const amide of amides){
@@ -6201,6 +6359,13 @@ function nameStructureIUPACCandidate(input=mol){
     if(el==='N'){
       const ns=adj[e.i].filter(x=>atoms[x.i].el!=='H'),os=ns.filter(x=>atoms[x.i].el==='O'),carbon=ns.filter(x=>atoms[x.i].el==='C');
       if((atom.q||0)===0&&e.o===2&&ns.length===1&&ns[0].i===c)return'imino';
+      if((atom.q||0)===0&&e.o===2&&carbon.length===ns.length&&ns.filter(x=>x.o===2&&x.i===c).length===1){
+        const nSubRoots=carbon.filter(x=>x.i!==c&&x.o===1);
+        if(nSubRoots.length===1){
+          const alkylName=describeAlkyl(nSubRoots[0].i,new Set([e.i]),adj,atoms);
+          if(alkylName)return registerAzanililidenoPrefix(alkylName);
+        }
+      }
       const nitroDoubleO=os.filter(x=>x.o===2),nitroSingleO=os.filter(x=>x.o===1);
       if(atom.q===1&&e.o===1&&ns.length===3&&carbon.length===1&&carbon[0].o===1&&nitroDoubleO.length===1&&(atoms[nitroDoubleO[0].i].q||0)===0&&nitroSingleO.length===1&&atoms[nitroSingleO[0].i].q===-1)return'nitro';
       const parentN=ns.find(x=>x.i===c),acylN=ns.find(x=>x.i!==c&&atoms[x.i].el==='C');
@@ -6211,7 +6376,10 @@ function nameStructureIUPACCandidate(input=mol){
           if(sideName&&length>=2&&length<=20){const stem=IUPAC_STEMS[length];if(length===2)return'acetamido';if(stem)return stem+'anamido';}
         }
       }
-      if(atom.q<=0&&ns.length===1&&ns[0].i===c&&ns[0].o===1)return'amino';
+      if(atom.q===0&&e.o===1&&carbon.length===ns.length&&ns.every(x=>x.o===1)&&carbon.filter(x=>x.i===c).length===1){
+        const otherGroups=carbon.filter(x=>x.i!==c).map(x=>describeAlkyl(x.i,new Set([e.i]),adj,atoms));
+        if(otherGroups.every(Boolean))return otherGroups.length?registerAminoPrefix(otherGroups):'amino';
+      }
       return null;
     }
     if(el==='S'){
@@ -6708,7 +6876,7 @@ function renderName(subs,base,kind,suffixLocs,doubles,triples,cyclic=false,aroma
   const prefixCount=[...groups.values()].reduce((count,locs)=>count+locs.length,0);
   const omitPrefixLocants=parentLength===1||(prefixCount===1&&parentIsVertexTransitive(parentLength,cyclic,doubles,triples,suffixLocs));
   const prefixEntries=[...groups].map(([name,locs])=>{
-    locs.sort((a,b)=>a-b);const citedName=/^(?:\d+(?:,\d+)*-)/.test(name)||/-\d+(?:,\d+)*-/.test(name)?'('+name+')':name;
+    locs.sort((a,b)=>a-b);const citedName=/^(?:\d+(?:,\d+)*-)/.test(name)||/-\d+(?:,\d+)*-/.test(name)||name.endsWith('amino')&&name!=='amino'?'('+name+')':name;
     return{name,locants:locs,text:(omitPrefixLocants?'':locs.join(',')+'-')+(mult[locs.length]||'')+citedName};
   });
   const nCounts=new Map();for(const name of nSubstituents)nCounts.set(name,(nCounts.get(name)||0)+1);
@@ -6771,11 +6939,16 @@ function nameSimplePrimaryAmine(input=mol){
   const locant=Math.min(chain.indexOf(attachment)+1,carbons.length+1-chain.indexOf(attachment)-1),stem=IUPAC_STEMS[carbons.length];
   return carbons.length<=2?stem+'anamina':stem+'an-'+locant+'-amina';
 }
-function currentIUPACName(){
-  const simplePrimaryAmine=nameSimplePrimaryAmine();if(simplePrimaryAmine)return simplePrimaryAmine;
-  const metadata=moleculeMetadata&&moleculeMetadata.signature===moleculeGraphSignature()?moleculeMetadata:null;
+function currentIUPACName(signature=moleculeGraphSignature()){
+  const simplePrimaryAmine=nameSimplePrimaryAmine();
+  if(simplePrimaryAmine){iupacNameCache={signature,name:simplePrimaryAmine};return simplePrimaryAmine;}
+  const metadata=moleculeMetadata&&moleculeMetadata.signature===signature?moleculeMetadata:null;
   if(metadata&&metadata.iupac&&metadata.source!=='parsed-name')return canonicalizePrincipalAmineName(metadata.iupac);
-  return canonicalizePrincipalAmineName(nameStructureIUPAC());
+  // A null result is cached too: unsupported graphs should not repeat the full naming search.
+  if(iupacNameCache&&iupacNameCache.signature===signature)return iupacNameCache.name;
+  const name=canonicalizePrincipalAmineName(nameStructureIUPAC());
+  iupacNameCache={signature,name};
+  return name;
 }
 
 /* ================= Interface ================= */
