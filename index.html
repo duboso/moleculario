@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CspA47Xr9wvZzhSZADytax2q5kGlbpSHw+fNvKP4Yiw='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-uvVQ2FShDOPbvDmQID/g/06w161AQVF2cssNUIB7P38='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Editor de moléculas simples, executado no navegador.">
 <meta property="og:title" content="Moleculário – Editor molecular">
@@ -166,6 +166,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 .canvas-float-tools button[data-tool="select"] svg{display:block;width:16px;height:16px}.canvas-float-tools button[data-tool="select"] path{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .canvas-float-tools button[data-tool="rotate"] svg{display:block;width:17px;height:17px}.canvas-float-tools button[data-tool="rotate"] path{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .toolbar button[data-tool="chain"] svg{display:inline-block;vertical-align:middle;width:19px;height:19px}.toolbar button[data-tool="chain"] path{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.panel-2d .toolbar button[data-tool="charge+"] svg,.panel-2d .toolbar button[data-tool="charge-"] svg{display:block;width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
 .panel-2d #c2d.chain-tool-active{cursor:crosshair}
 .toolbar button[data-ring="6"] svg,.toolbar button[data-ring="b"] svg{display:block;width:21px;height:21px}
 .toolbar button[data-ring="6"] polygon,.toolbar button[data-ring="b"] polygon,.toolbar button[data-ring="b"] circle{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
@@ -294,8 +295,8 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
         <option>B</option><option>Si</option><option>Se</option><option>Li</option><option>Na</option><option>K</option>
         <option>Mg</option><option>Ca</option><option>Fe</option><option>Zn</option><option>Cu</option></select></span>
       <span class="sep"></span>
-      <button data-tool="charge+" title="Aumentar carga" aria-label="Aumentar carga" aria-pressed="false">⊕</button>
-      <button data-tool="charge-" title="Diminuir carga" aria-label="Diminuir carga" aria-pressed="false">⊖</button>
+      <button data-tool="charge+" title="Aumentar carga" aria-label="Aumentar carga" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"></circle><path d="M8.5 12h7M12 8.5v7"></path></svg></button>
+      <button data-tool="charge-" title="Diminuir carga" aria-label="Diminuir carga" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"></circle><path d="M8.5 12h7"></path></svg></button>
       </div>
     </div>
       <canvas id="c2d" tabindex="0" role="application" aria-label="Editor molecular 2D" aria-describedby="info2d keyboardHelp2d keyboardStatus2d" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space Delete Backspace Escape"></canvas><div class="info" id="info2d" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -331,7 +332,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
           <button id="btnReset" title="Reiniciar vista" aria-label="Reiniciar vista"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 11a8.5 8.5 0 1 1 2.4 6M3.5 4.5V11H10"></path></svg></button>
           <button id="btnVibrationMenu" title="Opções de vibração" aria-label="Opções de vibração" aria-expanded="false" aria-controls="vibrationPanel"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="3.5" r="2.1"></circle><path d="M12 5.8v1.4L9 9l6 2.2-6 2.2 6 2.2-3 1.7v1.2M4 20h16"></path></svg></button>
           <button id="btnViewMenu" title="Opções de exibição" aria-label="Opções de exibição" aria-expanded="false" aria-controls="viewPanel"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg></button>
-          <button id="btnCycleBackground" data-bg="dark" title="Fundo escuro; clique para alternar" aria-label="Fundo escuro; clique para alternar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="bg-icon bg-icon-light"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4m10.6 10.6 1.4 1.4m0-13.4-1.4 1.4M6.7 17.3l-1.4 1.4"></path></g><g class="bg-icon bg-icon-gray"><path d="M6 14a6 6 0 0 1 12 0M3 14h18M12 3v2M5.6 6.6 7 8m10-1.4L15.6 8"></path></g><g class="bg-icon bg-icon-dark"><path d="M7 15a5 5 0 0 1 10 0M3 15h18M5 19h14M8 21h8"></path></g></svg></button>
+          <button id="btnCycleBackground" data-bg="dark" title="Fundo escuro; clique para alternar" aria-label="Fundo escuro; clique para alternar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="bg-icon bg-icon-light"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4m10.6 10.6 1.4 1.4m0-13.4-1.4 1.4M6.7 17.3l-1.4 1.4"></path></g><g class="bg-icon bg-icon-gray"><path d="M6 14a6 6 0 0 1 12 0M3 14h18M12 4.96v3.04M5.6 7.6l2.15 2.15M18.4 7.6l-2.15 2.15"></path></g><g class="bg-icon bg-icon-dark"><path d="M7 15a5 5 0 0 1 10 0M3 15h18M5 18h14M8 21h8"></path></g></svg></button>
         </div>
         <div class="viewer-popover vibration-panel" id="vibrationPanel" role="group" aria-label="Opções de vibração" hidden>
           <div class="view-style-dropdown vibration-mode-dropdown">
@@ -396,7 +397,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 </dialog>
 <dialog id="dlgCredits" aria-labelledby="dlgCreditsTitle">
   <h3 id="dlgCreditsTitle">Créditos e referências</h3>
-  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.0<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
+  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.1<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
   <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. O conversor IUPAC é parcial; a animação vibracional é qualitativa e não calcula frequências espectroscópicas.</p>
   <p><b>Desenvolvimento:</b> este app foi feito por ChatGPT (OpenAI), Claude (Anthropic) e Gemini (Google), com base nas orientações do usuário.</p>
   <ul>
@@ -4907,7 +4908,7 @@ const IUPAC_NAMES=Object.freeze({
   isobutano:'2-metilpropano',isopentano:'2-metilbutano',neopentano:'2,2-dimetilpropano',
   '1-buteno':'but-1-eno','2-buteno':'but-2-eno','1-penteno':'pent-1-eno','2-penteno':'pent-2-eno','1-hexeno':'hex-1-eno',
   '1-butino':'but-1-ino','2-butino':'but-2-ino','1-hexino':'hex-1-ino','2-hexino':'hex-2-ino',
-  ciclobutano:'ciclobutano',ciclopenteno:'ciclopent-1-eno',cicloheptano:'cicloheptano',metilciclohexano:'metilciclohexano',
+  ciclobutano:'ciclobutano',ciclopenteno:'ciclopenteno',cicloheptano:'cicloheptano',metilciclohexano:'metilciclohexano',
   isopreno:'2-metilbuta-1,3-dieno',etilbenzeno:'etilbenzeno','o-xileno':'1,2-dimetilbenzeno',
   'm-xileno':'1,3-dimetilbenzeno','p-xileno':'1,4-dimetilbenzeno',estireno:'etenilbenzeno',
   cumeno:'propan-2-ilbenzeno',benzaldeido:'benzaldeído','alcool benzilico':'fenilmetanol',anisol:'metoxibenzeno',
@@ -4916,10 +4917,10 @@ const IUPAC_NAMES=Object.freeze({
   'cloreto de benzila':'(clorometil)benzeno','o-cresol':'2-metilfenol','m-cresol':'3-metilfenol','p-cresol':'4-metilfenol',
   '1-propanol':'propan-1-ol','1-butanol':'butan-1-ol','2-butanol':'butan-2-ol',
   'terc-butanol':'2-metilpropan-2-ol','1-pentanol':'pentan-1-ol','1-hexanol':'hexan-1-ol',
-  ciclohexanol:'ciclohexan-1-ol',propilenoglicol:'propano-1,2-diol','1,3-propanodiol':'propano-1,3-diol',
+  ciclohexanol:'ciclohexanol',propilenoglicol:'propano-1,2-diol','1,3-propanodiol':'propano-1,3-diol',
   '1,4-butanodiol':'butano-1,4-diol','eter dimetilico':'metoximetano','eter metil-etilico':'metoxietano',
   '1,2-dimetoxietano':'1,2-dimetoxietano','1,4-dioxano':'1,4-dioxano',propanal:'propanal',butanal:'butanal',
-  '2-butanona':'butan-2-ona',ciclohexanona:'ciclohexan-1-ona','formiato de metila':'metanoato de metila',
+  '2-butanona':'butan-2-ona',ciclohexanona:'ciclohexanona','formiato de metila':'metanoato de metila',
   'acetato de metila':'etanoato de metila','propionato de metila':'propanoato de metila',
   'acido propionico':'ácido propanoico','acido butirico':'ácido butanoico','acido oxalico':'ácido etanodioico',
   'acido malonico':'ácido propanodioico','acido succinico':'ácido butanodioico','acido adipico':'ácido hexanodioico',
@@ -6711,11 +6712,11 @@ function nameSimpleNAlkylAmine(atoms,adj,heavy){
 function parentBase(n,cyclic,aromatic,doubles,triples,omitSimpleUnsaturationLocant=false){
   if(aromatic)return'benzen';const stem=IUPAC_STEMS[n]||'pent';const pre=cyclic?'ciclo':'';
   if(doubles.length&&triples.length)return null;
-  if(doubles.length===1)return omitSimpleUnsaturationLocant?pre+stem+'en':pre+stem+'-'+doubles[0]+'-en';
+  if(doubles.length===1)return (omitSimpleUnsaturationLocant||cyclic&&doubles[0]===1)?pre+stem+'en':pre+stem+'-'+doubles[0]+'-en';
   if(doubles.length===2)return pre+stem+'a-'+doubles.join(',')+'-dien';
   if(doubles.length===3)return pre+stem+'a-'+doubles.join(',')+'-trien';
   if(doubles.length>3||triples.length>3)return null;
-  if(triples.length===1)return omitSimpleUnsaturationLocant?pre+stem+'in':pre+stem+'-'+triples[0]+'-in';
+  if(triples.length===1)return (omitSimpleUnsaturationLocant||cyclic&&triples[0]===1)?pre+stem+'in':pre+stem+'-'+triples[0]+'-in';
   if(triples.length===2)return pre+stem+'a-'+triples.join(',')+'-diin';
   if(triples.length===3)return pre+stem+'a-'+triples.join(',')+'-triin';
   return pre+stem+'an';
@@ -6778,19 +6779,48 @@ function renderName(subs,base,kind,suffixLocs,doubles,triples,cyclic=false,aroma
   else if(kind==='aldehyde')body=base+'al';
   else if(kind==='amide')body=base+'amida';
   else if(kind==='nitrile')body=base+'onitrila';
-  else if(kind==='ketone'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'ona',2:'diona',3:'triona',4:'tetraona'}[loc.length];if(!suffix)return null;body=linkedSuffix(base,loc,suffix);}
-  else if(kind==='alcohol'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'ol',2:'diol',3:'triol',4:'tetrol',5:'pentol'}[loc.length];if(!suffix)return null;const implicitLoc=loc.length===1&&loc[0]===1&&!doubles.length&&!triples.length&&(base==='metan'||base==='etan');body=implicitLoc?base+suffix:linkedSuffix(base,loc,suffix);}
-  else if(kind==='amine'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'amina',2:'diamina',3:'triamina',4:'tetramina'}[loc.length];if(!suffix)return null;const implicitLoc=loc.length===1&&loc[0]===1&&!doubles.length&&!triples.length&&(base==='metan'||base==='etan');body=implicitLoc?base+suffix:linkedSuffix(base,loc,suffix);}
-  else if(kind==='thiol'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'tiol',2:'ditiol',3:'tritiol',4:'tetratiol'}[loc.length];if(!suffix)return null;body=canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
-  else if(kind==='imine'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'imina',2:'diimina',3:'triimina',4:'tetraimina'}[loc.length];if(!suffix)return null;const implicitLoc=loc.length===1&&loc[0]===1&&!doubles.length&&!triples.length&&(base==='metan'||base==='etan');body=implicitLoc?base+suffix:linkedSuffix(base,loc,suffix);}
+  else if(kind==='ketone'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'ona',2:'diona',3:'triona',4:'tetraona'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
+  else if(kind==='alcohol'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'ol',2:'diol',3:'triol',4:'tetrol',5:'pentol'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
+  else if(kind==='amine'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'amina',2:'diamina',3:'triamina',4:'tetramina'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
+  else if(kind==='thiol'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'tiol',2:'ditiol',3:'tritiol',4:'tetratiol'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
+  else if(kind==='imine'){const loc=suffixLocs.length?suffixLocs:[1],suffix={1:'imina',2:'diimina',3:'triimina',4:'tetraimina'}[loc.length];if(!suffix)return null;body=prefixCount===0&&canOmitSuffixLocantForSymmetry(parentLength,cyclic,doubles,triples,loc)?base+(suffixNeedsLinkingVowel(suffix)?'o':'')+suffix:linkedSuffix(base,loc,suffix);}
   if(aromatic&&kind==='amine'&&suffixLocs.length===1&&suffixLocs[0]===1)body='benzenamina';
   if(aromatic&&kind==='alcohol'&&suffixLocs.length===1&&suffixLocs[0]===1){body='fenol';if(prefix==='1-hidroxi')prefix='';}
   return kind==='acidHalide'&&prefix?prefix+'-'+body:prefix+body;
 }
+function canonicalizePrincipalAmineName(name){
+  if(typeof name!=='string')return name;
+  const match=/^(\d+)-amino(met|et|prop|but|pent|hex|hept|oct|non|dec|undec|dodec|tridec|tetradec|pentadec|hexadec|heptadec|octadec|nonadec|icos|eicos)ano$/.exec(norm(name));
+  return match?match[2]+'an-'+match[1]+'-amina':name;
+}
+function nameSimplePrimaryAmine(input=mol){
+  const atoms=input.atoms||[],bonds=input.bonds||[],index=new Map(atoms.map((atom,i)=>[atom.id===undefined?i:atom.id,i]));
+  const heavy=atoms.map((atom,i)=>atom.el==='H'?-1:i).filter(i=>i>=0);
+  if(heavy.length<2||heavy.some(i=>!['C','N'].includes(atoms[i].el)||(atoms[i].q||0)!==0||atoms[i].stereo||atoms[i]._valenceWarning))return null;
+  const nitrogens=heavy.filter(i=>atoms[i].el==='N'),carbons=heavy.filter(i=>atoms[i].el==='C');
+  if(nitrogens.length!==1||!IUPAC_STEMS[carbons.length]||heavy.length!==carbons.length+1)return null;
+  const nitrogen=nitrogens[0],carbonAdj=new Map(carbons.map(i=>[i,[]]));let attachment=null,carbonEdges=0;
+  for(const bond of bonds){const a=index.get(bond.a),b=index.get(bond.b);if(a===undefined||b===undefined)return null;
+    if(atoms[a].el==='H'||atoms[b].el==='H')continue;
+    if(bond.o!==1)return null;
+    if(atoms[a].el==='C'&&atoms[b].el==='C'){carbonAdj.get(a).push(b);carbonAdj.get(b).push(a);carbonEdges++;}
+    else if(a===nitrogen&&atoms[b].el==='C'&&!attachment)attachment=b;
+    else if(b===nitrogen&&atoms[a].el==='C'&&!attachment)attachment=a;
+    else return null;
+  }
+  if(attachment===null||carbonEdges!==carbons.length-1||[...carbonAdj.values()].some(neighbors=>neighbors.length>2))return null;
+  const ends=carbons.filter(i=>carbonAdj.get(i).length===1);if(carbons.length>1&&ends.length!==2)return null;
+  const chain=[carbons.length===1?carbons[0]:ends[0]];let previous=-1;
+  while(chain.length<carbons.length){const current=chain[chain.length-1],next=carbonAdj.get(current).find(i=>i!==previous);if(next===undefined)return null;previous=current;chain.push(next);}
+  if(chain.indexOf(attachment)<0)return null;
+  const locant=Math.min(chain.indexOf(attachment)+1,carbons.length+1-chain.indexOf(attachment)-1),stem=IUPAC_STEMS[carbons.length];
+  return carbons.length<=2?stem+'anamina':stem+'an-'+locant+'-amina';
+}
 function currentIUPACName(){
+  const simplePrimaryAmine=nameSimplePrimaryAmine();if(simplePrimaryAmine)return simplePrimaryAmine;
   const metadata=moleculeMetadata&&moleculeMetadata.signature===moleculeGraphSignature()?moleculeMetadata:null;
-  if(metadata&&metadata.iupac&&metadata.source!=='parsed-name')return metadata.iupac;
-  return nameStructureIUPAC();
+  if(metadata&&metadata.iupac&&metadata.source!=='parsed-name')return canonicalizePrincipalAmineName(metadata.iupac);
+  return canonicalizePrincipalAmineName(nameStructureIUPAC());
 }
 
 /* ================= Interface ================= */
