@@ -397,9 +397,9 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 </dialog>
 <dialog id="dlgCredits" aria-labelledby="dlgCreditsTitle">
   <h3 id="dlgCreditsTitle">Créditos e referências</h3>
-  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.5<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
-  <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. A animação vibracional é qualitativa e não calcula frequências espectroscópicas.</p>
-  <p><b>Desenvolvimento:</b> este app foi feito por ChatGPT (OpenAI), Claude (Anthropic) e Gemini (Google), com base nas orientações do usuário.</p>
+  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.5.1<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
+  <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. A animação vibracional é, naturalmente, qualitativa.</p>
+  <p><b>Desenvolvimento:</b> este app foi feito pelas mãos do ChatGPT (OpenAI), com alguns toques do Claude (Anthropic) e do Gemini (Google). Minha contribuição se deu principalmente na interface/layout.</p>
   <ul>
     <li><b>SMILES e nomenclatura:</b> <a href="https://opensmiles.org/opensmiles.pdf" target="_blank" rel="noopener noreferrer">OpenSMILES</a> (subconjunto) e <a href="https://iupac.qmul.ac.uk/BlueBook/" target="_blank" rel="noopener noreferrer">IUPAC Blue Book</a> (P-1, P-4 e P-9).</li>
     <li><b>Cargas parciais:</b> método de Gasteiger e Marsili, <i>Tetrahedron</i> 36 (1980), 3219–3228 (<a href="https://doi.org/10.1016/0040-4020(80)80168-2" target="_blank" rel="noopener noreferrer">DOI</a>). Os coeficientes usados para H, C, N, O, F, P (sp3), Cl, Br, I, S (incluindo so2 para grupos sulfonila) e Si vêm da tabela Gasteiger do <a href="https://github.com/rdkit/rdkit/blob/master/Code/GraphMol/PartialCharges/GasteigerParams.cpp" target="_blank" rel="noopener noreferrer">RDKit</a>; redistribuídos sob BSD 3-Clause, com aviso abaixo. O cálculo local simplifica o método e distribui por ressonância as cargas formais dos oxigênios equivalentes em carboxilatos e grupos nitro.</li>
