@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7IUHfaAM4mODs6kWXggwirmpgggVg5UssokrQUFzwsI='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-uXOLdQ7cS3Vi8GUySm3SL4JtOi+E6r8lsej2RAiRKig='; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="Editor de moléculas simples, executado no navegador.">
 <meta property="og:title" content="Moleculário – Editor molecular">
@@ -397,7 +397,7 @@ section.panel-2d{border-right:1px solid var(--divider-strong)}
 </dialog>
 <dialog id="dlgCredits" aria-labelledby="dlgCreditsTitle">
   <h3 id="dlgCreditsTitle">Créditos e referências</h3>
-  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.4<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
+  <p><b>App:</b> Moleculário<br><b>Versão:</b> 0.8.5<br><b>Copyright:</b> © 2026 duboso<br><b>Licença:</b> BSD 3-Clause</p>
   <p>App autocontido, sem dependências externas.<br>Os modelos e cálculos são implementações locais e aproximadas. A animação vibracional é qualitativa e não calcula frequências espectroscópicas.</p>
   <p><b>Desenvolvimento:</b> este app foi feito por ChatGPT (OpenAI), Claude (Anthropic) e Gemini (Google), com base nas orientações do usuário.</p>
   <ul>
@@ -1085,7 +1085,9 @@ function parseSMILES(s){
   }
   kekulize(atoms,bonds);
   validateBracketHydrogens(atoms,bonds);
-  return{atoms,bonds};
+  const graph={atoms,bonds};
+  normalizeNonStereogenicTetrahedralMarks(graph);
+  return graph;
 }
 function kekulize(atoms,bonds){
   const ab=bonds.filter(b=>b.o===1.5);
@@ -5272,6 +5274,31 @@ function parseParentTail(tail,n,cyclic){
   return null;
 }
 function compareNumberingScores(a,b){for(let i=0;i<Math.max(a.length,b.length);i++){const d=(a[i]??Infinity)-(b[i]??Infinity);if(d)return d;}return 0;}
+const CIP_NUMBERING_PREFERENCE=Object.freeze({Z:0,R:0,M:0,r:0,E:1,S:1,P:1,s:1});
+function stereochemicalDescriptorScore(descriptors){
+  return descriptors.map(descriptor=>({priority:descriptor.priority===undefined?CIP_NUMBERING_PREFERENCE[descriptor.kind]:descriptor.priority,loc:descriptor.loc}))
+    .filter(descriptor=>Number.isInteger(descriptor.loc)&&descriptor.priority!==undefined)
+    .sort((a,b)=>a.priority-b.priority||a.loc-b.loc)
+    .flatMap(descriptor=>[descriptor.priority,descriptor.loc]);
+}
+function stereochemicalNumberingScore(descriptors,atomMap,bondMap){
+  const mapped=[];
+  for(const descriptor of descriptors){
+    if(!Number.isInteger(descriptor.loc)||CIP_NUMBERING_PREFERENCE[descriptor.kind]===undefined)continue;
+    const loc=(descriptor.kind==='E'||descriptor.kind==='Z'?bondMap:atomMap).get(descriptor.loc);
+    if(Number.isInteger(loc))mapped.push({priority:CIP_NUMBERING_PREFERENCE[descriptor.kind],loc});
+  }
+  return stereochemicalDescriptorScore(mapped);
+}
+function comparePrefixLocants(a,b){
+  const rank=locant=>locant===undefined?0:locant==='N'?1:typeof locant==='number'?3:2;
+  for(let i=0;i<Math.max(a.length,b.length);i++){
+    const left=a[i],right=b[i],rankDifference=rank(left)-rank(right);if(rankDifference)return rankDifference;
+    if(typeof left==='number'&&typeof right==='number'&&left!==right)return left-right;
+    if(left!==right)return String(left).localeCompare(String(right),'pt');
+  }
+  return 0;
+}
 function numberingScore(parent,prefixes,n,atomMap,bondMap,ignoreUnsaturation=false){
   const atomLoc=loc=>atomMap.get(loc),bondLoc=loc=>bondMap.get(loc);
   const suffix=(parent.locants||[]).map(atomLoc).sort((a,b)=>a-b);
@@ -5282,10 +5309,10 @@ function numberingScore(parent,prefixes,n,atomMap,bondMap,ignoreUnsaturation=fal
   const firstPrefix=names.length?groups.get(names[0]).sort((a,b)=>a-b):[];
   return[...suffix,0,...unsaturation,0,...doubleUnsaturation,0,...allLocants,0,...firstPrefix];
 }
-function hasPreferredNumbering(parent,prefixes,n,cyclic,ignoreUnsaturation=false){
+function hasPreferredNumbering(parent,prefixes,n,cyclic,ignoreUnsaturation=false,stereoDescriptors=[]){
   const atomIdentity=new Map(Array.from({length:n},(_,i)=>[i+1,i+1]));
   const bondIdentity=new Map(Array.from({length:n-1+(cyclic?1:0)},(_,i)=>[i+1,i+1]));
-  const baseline=numberingScore(parent,prefixes,n,atomIdentity,bondIdentity,ignoreUnsaturation),maps=[];
+  const baseline=numberingScore(parent,prefixes,n,atomIdentity,bondIdentity,ignoreUnsaturation),baselineStereo=stereochemicalNumberingScore(stereoDescriptors,atomIdentity,bondIdentity),maps=[];
   if(cyclic){
     for(let start=0;start<n;start++)for(const direction of [1,-1]){
       const atomMap=new Map();for(let pos=1;pos<=n;pos++)atomMap.set(((start+direction*(pos-1)+n*2)%n)+1,pos);
@@ -5297,7 +5324,10 @@ function hasPreferredNumbering(parent,prefixes,n,cyclic,ignoreUnsaturation=false
     const bondMap=new Map(Array.from({length:Math.max(0,n-1)},(_,i)=>[i+1,n-i-1]));
     maps.push([atomMap,bondMap]);
   }
-  return maps.every(([atomMap,bondMap])=>compareNumberingScores(numberingScore(parent,prefixes,n,atomMap,bondMap,ignoreUnsaturation),baseline)>=0);
+  return maps.every(([atomMap,bondMap])=>{
+    const structural=compareNumberingScores(numberingScore(parent,prefixes,n,atomMap,bondMap,ignoreUnsaturation),baseline);
+    return structural>0||structural===0&&compareNumberingScores(stereochemicalNumberingScore(stereoDescriptors,atomMap,bondMap),baselineStereo)>=0;
+  });
 }
 function validNamedParent(parent,n,cyclic){
   const maxBond=n-1+(cyclic?1:0),allBonds=[...(parent.doubles||[]),...(parent.triples||[])];
@@ -5532,6 +5562,28 @@ function cipTetraDescriptor(context,atomIndex){
     context.stereoDescriptors.set(atomIndex,descriptor);
     return descriptor;
   }finally{context.resolvingTetraCenters.delete(atomIndex);}
+}
+function hasEquivalentTetrahedralLigands(g,atomIndex){
+  const context=cipGraphContext(g),unresolvedAtStart=context.unresolvedComparisons,ranked=namedLigands(g,atomIndex,null,true);
+  if(ranked.length!==4)return false;
+  let equivalent=false;
+  for(let i=1;i<ranked.length;i++)if(compareCipLigandTrees(context,ranked[i-1].tree,ranked[i].tree)===0)equivalent=true;
+  return equivalent&&context.unresolvedComparisons===unresolvedAtStart;
+}
+function normalizeNonStereogenicTetrahedralMarks(g){
+  let removed=false,changed=true;
+  while(changed){
+    changed=false;
+    for(let i=0;i<g.atoms.length;i++)if(g.atoms[i].stereo){
+      let descriptor=null;
+      try{descriptor=cipTetraDescriptor(cipGraphContext(g),i);}catch(_){continue;}
+      let nonStereogenic=false;
+      try{nonStereogenic=hasEquivalentTetrahedralLigands(g,i);}catch(_){continue;}
+      if(descriptor||!nonStereogenic)continue;
+      g.atoms[i].stereo=null;clearCipPriorityCaches(g);changed=true;removed=true;break;
+    }
+  }
+  return removed;
 }
 function cipLigandsEnantiomorphic(context,a,b){
   if(compareCipTrees(a,b)!==0)return false;
@@ -5784,14 +5836,21 @@ function parseIUPACName(name){
   let s=norm(raw);
   if(!s)return null;
   const nSubstituents=[];
-  while(true){
-    const nPrefix=s.match(/^n(,n)?-(di|tri|tetra)?(?:(metil|etil|[a-z]+an-\d+-il)|\((metil|etil|[a-z]+an-\d+-il)\))(?=-|[a-z])/);
-    if(!nPrefix)break;
-    const count={di:2,tri:3,tetra:4}[nPrefix[2]]||1,substituent=nPrefix[3]||nPrefix[4];
-    if(nPrefix[1]&&count<2||!['metil','etil'].includes(substituent)&&!IUPAC_ALKYL_PREFIXES[substituent])return null;
-    for(let i=0;i<count;i++)nSubstituents.push(substituent);
-    const delimiter=s[nPrefix[0].length]==='-'?1:0;s=s.slice(nPrefix[0].length+delimiter);
-  }
+  let invalidNPrefix=false;
+  const nMultiplierCounts=Object.fromEntries(Object.entries(IUPAC_MULTIPLIERS).map(([count,prefix])=>[prefix,+count]));
+  const nMultiplierByCount=Object.fromEntries(Object.entries(IUPAC_MULTIPLIERS).map(([count,prefix])=>[+count,prefix]));
+  const nMultiplierPattern=Object.keys(nMultiplierCounts).sort((a,b)=>b.length-a.length).join('|');
+  const nSubstituentPattern=new RegExp('(^|-)((?:n|\\d+)(?:,(?:n|\\d+))*)-('+nMultiplierPattern+')?((?:metil|etil|[a-z]+an-\\d+-il)|\\((?:metil|etil|[a-z]+an-\\d+-il)\\))(?=-|[a-z])','g');
+  s=s.replace(nSubstituentPattern,(whole,separator,rawLocants,multiplier,rawSubstituent)=>{
+    const locants=rawLocants.split(','),count=nMultiplierCounts[multiplier]||1,substituent=rawSubstituent.replace(/^\(|\)$/g,'');
+    if(!locants.includes('n'))return whole;
+    if(locants.length!==count||!['metil','etil'].includes(substituent)&&!IUPAC_ALKYL_PREFIXES[substituent]){invalidNPrefix=true;return whole;}
+    const carbonLocants=locants.filter(locant=>locant!=='n');
+    for(let i=0;i<locants.filter(locant=>locant==='n').length;i++)nSubstituents.push(substituent);
+    const remainingPrefix=carbonLocants.length?separator+carbonLocants.join(',')+'-'+(nMultiplierByCount[carbonLocants.length]||'')+rawSubstituent:'';
+    return remainingPrefix;
+  }).replace(/^-+|-+$/g,'').replace(/--+/g,'-');
+  if(invalidNPrefix)return null;
   const finish=(g,n,cyclic,parent)=>{
     g=validateNamedGraph(g);
     if(nSubstituents.length){
@@ -5966,7 +6025,7 @@ function parseIUPACName(name){
   if(aromaticAttachedSuffix){
     if(stereo.length)return null;
     const kind=suffixKind(aromaticAttachedSuffix[3]),prefixes=parsePrefixNames(aromaticAttachedSuffix[1],true),locants=parseLocantList(aromaticAttachedSuffix[2],IUPAC_SUFFIX_COUNT[aromaticAttachedSuffix[3]]),parent={kind,doubles:[1,3,5],triples:[],locants:locants||[]};
-    if(aromaticSuffixKinds.includes(kind)&&prefixes&&locants&&locants.every(loc=>loc<=6)&&validNamedParent(parent,6,true)&&hasPreferredNumbering(parent,prefixes,6,true))
+    if(aromaticSuffixKinds.includes(kind)&&prefixes&&locants&&locants.every(loc=>loc<=6)&&validNamedParent(parent,6,true)&&hasPreferredNumbering(parent,prefixes,6,true,false,stereo))
       return finish(makeNamedChain(6,true,parent,prefixes),6,true,parent);
   }
   if(s==='fenol')return finish(makeNamedChain(6,true,{kind:null,doubles:[1,3,5]},[{loc:1,name:'hidroxi'}]),6,true,{doubles:[1,3,5]});
@@ -5974,7 +6033,7 @@ function parseIUPACName(name){
   const benzoic=s.match(/^(.*?)(?:benzoico|benzenocarboxilico)$/);
   if(benzoic){
     const prefixes=parsePrefixNames(benzoic[1],true),acidParent={kind:null,doubles:[],triples:[],locants:[1]};
-    if(prefixes&&validNamedParent(acidParent,6,true)&&(!prefixes.hasUnlocated||prefixes.length===1&&parentIsVertexTransitive(6,true,acidParent.doubles,acidParent.triples,acidParent.locants))&&hasPreferredNumbering(acidParent,prefixes,6,true,true)){
+    if(prefixes&&validNamedParent(acidParent,6,true)&&(!prefixes.hasUnlocated||prefixes.length===1&&parentIsVertexTransitive(6,true,acidParent.doubles,acidParent.triples,acidParent.locants))&&hasPreferredNumbering(acidParent,prefixes,6,true,true,stereo)){
       const aromaticParent={kind:null,doubles:[1,3,5],triples:[],locants:[]},g=makeNamedChain(6,true,aromaticParent,prefixes);
       const carbonyl=addNameAtom(g,'C'),oxo=addNameAtom(g,'O'),hydroxy=addNameAtom(g,'O');
       addNameBond(g,0,carbonyl);addNameBond(g,carbonyl,oxo,2);addNameBond(g,carbonyl,hydroxy);
@@ -5984,7 +6043,7 @@ function parseIUPACName(name){
   const aromaticCarbonyl=s.match(/^(.*?)(benzaldeido|benzamida)$/);
   if(aromaticCarbonyl){
     const prefixes=parsePrefixNames(aromaticCarbonyl[1],true),parent={kind:null,doubles:[1,3,5],triples:[],locants:[]},numberingParent={kind:null,doubles:[],triples:[],locants:[1]};
-    if(prefixes&&hasPreferredNumbering(numberingParent,prefixes,6,true,true)){
+    if(prefixes&&hasPreferredNumbering(numberingParent,prefixes,6,true,true,stereo)){
       const g=makeNamedChain(6,true,parent,prefixes),carbonyl=addNameAtom(g,'C'),oxo=addNameAtom(g,'O');
       addNameBond(g,0,carbonyl);addNameBond(g,carbonyl,oxo,2);
       if(aromaticCarbonyl[2]==='benzamida'){const nitrogen=addNameAtom(g,'N');addNameBond(g,carbonyl,nitrogen);}
@@ -5992,7 +6051,7 @@ function parseIUPACName(name){
     }
   }
   const benz=s.match(/^(.*)benzeno$/);
-  if(benz){let pref=parsePrefixNames(benz[1],true);const aromaticParent={kind:null,doubles:[],triples:[],locants:[]};if(pref&&(!pref.hasUnlocated||pref.length===1)&&hasPreferredNumbering(aromaticParent,pref,6,true,true)){const g=makeNamedChain(6,true,{kind:null,doubles:[1,3,5]},pref);return finish(g,6,true,aromaticParent);}}
+  if(benz){let pref=parsePrefixNames(benz[1],true);const aromaticParent={kind:null,doubles:[],triples:[],locants:[]};if(pref&&(!pref.hasUnlocated||pref.length===1)&&hasPreferredNumbering(aromaticParent,pref,6,true,true,stereo)){const g=makeNamedChain(6,true,{kind:null,doubles:[1,3,5]},pref);return finish(g,6,true,aromaticParent);}}
   let nonPreferredCandidate=null;
   for(const[root,n]of IUPAC_ROOTS){
     let at=s.indexOf(root);
@@ -6008,7 +6067,7 @@ function parseIUPACName(name){
       if(prefixes.hasUnlocated&&prefixes.length&&!(n===1||(prefixes.length===1&&parentIsVertexTransitive(n,cyclic,parent.doubles,parent.triples,parent.locants))))continue;
       if(cyclic&&n<3)continue;
       if(!validNamedParent(parent,n,cyclic)||prefixes.some(p=>p.loc>n))continue;
-      const longestParent=hasLongestNamedParent(parent,prefixes,n,cyclic),preferredNumbering=hasPreferredNumbering(parent,prefixes,n,cyclic);
+      const longestParent=hasLongestNamedParent(parent,prefixes,n,cyclic),preferredNumbering=hasPreferredNumbering(parent,prefixes,n,cyclic,false,stereo);
       const graph=finish(makeNamedChain(n,cyclic,parent,prefixes),n,cyclic,parent);
       if(!longestParent||!preferredNumbering){
         if(!nonPreferredCandidate){
@@ -6449,8 +6508,10 @@ function hasCyclicAmideOrLactone(atoms,adj){
 
 function nameStructureIUPACCandidate(input=mol){
   if(!input.atoms.length)return null;
-  const atoms=input.atoms,idx=new Map(atoms.map((a,i)=>[a.id,i])),adj=atoms.map(()=>[]),edges=[];
+  const atoms=input.atoms.map(atom=>({...atom,stereo:atom.stereo?{...atom.stereo,refs:atom.stereo.refs.slice()}:null})),idx=new Map(atoms.map((a,i)=>[a.id,i])),adj=atoms.map(()=>[]),edges=[];
   for(const b of input.bonds){const a=idx.get(b.a),c=idx.get(b.b);if(a===undefined||c===undefined)continue;adj[a].push({i:c,o:b.o});adj[c].push({i:a,o:b.o});edges.push({a,c,o:b.o,dir:b.dir,dirFrom:b.dirFrom===b.a?a:b.dirFrom===b.b?c:undefined});}
+  const cipGraph={atoms,bonds:edges.map(edge=>({a:edge.a,b:edge.c,o:edge.o,dir:edge.dir,dirFrom:edge.dirFrom}))};
+  normalizeNonStereogenicTetrahedralMarks(cipGraph);
   const heavy=atoms.map((a,i)=>a.el==='H'?-1:i).filter(i=>i>=0);if(!heavy.length)return null;
   if(heavy.some(i=>atoms[i]._valenceWarning))return null;
   const seen=new Set([heavy[0]]),q=[heavy[0]];for(let h=0;h<q.length;h++)for(const e of adj[q[h]])if(atoms[e.i].el!=='H'&&!seen.has(e.i)){seen.add(e.i);q.push(e.i);}if(seen.size!==heavy.length)return null;
@@ -6790,12 +6851,28 @@ function nameStructureIUPACCandidate(input=mol){
     if(label==='amino'&&['amide','amine'].includes(kind))return false;
     return true;
   }
+  function pathStereoDescriptors(path){
+    const descriptors=[];
+    for(let loc=1;loc<=path.length;loc++){
+      const atomIndex=path[loc-1];if(atoms[atomIndex].stereo){
+        let kind=null;try{kind=cipTetraDescriptor(cipGraphContext(cipGraph),atomIndex);}catch(_){/* unsupported descriptor is rejected after parent selection */}
+        if(kind)descriptors.push({loc,kind});
+      }
+      const next=loc===path.length?(isCycle?path[0]:undefined):path[loc];
+      if(next===undefined)continue;
+      const bond=cipGraph.bonds.find(edge=>edge.o===2&&(edge.a===atomIndex&&edge.b===next||edge.b===atomIndex&&edge.a===next));
+      if(bond){let kind=null;try{kind=cipDoubleDescriptor(cipGraphContext(cipGraph),bond);}catch(_){/* unsupported descriptor is rejected after parent selection */}
+        if(kind)descriptors.push({loc,kind});}
+    }
+    return descriptors;
+  }
   function orientationScore(path){
     const suffix=centers.filter(i=>path.includes(i)).map(i=>path.indexOf(i)+1).sort((a,b)=>a-b),uns=[],doubleUns=[];if(!aromatic){for(let k=0;k<path.length-1;k++){const e=cadj.get(path[k]).find(x=>x.i===path[k+1]);if(e&&e.o>1){uns.push(k+1);if(e.o<2.75)doubleUns.push(k+1);}}if(isCycle){const e=cadj.get(path[path.length-1]).find(x=>x.i===path[0]);if(e&&e.o>1){uns.push(path.length);if(e.o<2.75)doubleUns.push(path.length);}}}
     const groups=new Map();for(let k=0;k<path.length;k++)for(const e of adj[path[k]])if(atoms[e.i].el!=='H'&&!path.includes(e.i)){const label=externalLabel(path[k],e,path);if(label&&isDetachablePrefix(path[k],label)){if(!groups.has(label))groups.set(label,[]);groups.get(label).push(k+1);}}
     const names=[...groups.keys()].sort(comparePrefixNames),allLocants=[...groups.values()].flat().sort((a,b)=>a-b);
     const firstPrefix=names.length?groups.get(names[0]).sort((a,b)=>a-b):[];
-    return[...suffix,99,...uns,99,...doubleUns,99,...allLocants,99,...firstPrefix];
+    const stereoScore=stereochemicalDescriptorScore(pathStereoDescriptors(path));
+    return[...suffix,99,...uns,99,...doubleUns,99,...allLocants,99,...firstPrefix,99,...stereoScore];
   }
   const candidates=[];
   if(isCycle){for(let k=0;k<parentPath.length;k++)for(const dir of [1,-1])candidates.push(Array.from({length:parentPath.length},(_,j)=>parentPath[(k+dir*j+parentPath.length*2)%parentPath.length]));}
@@ -6805,16 +6882,13 @@ function nameStructureIUPACCandidate(input=mol){
   for(const atomIndex of parentPath)if(!coverage.markAtom(atomIndex))return null;
   for(let k=0;k<parentPath.length-1;k++)if(!coverage.markBond(parentPath[k],parentPath[k+1]))return null;
   if(isCycle&&!coverage.markBond(parentPath[parentPath.length-1],parentPath[0]))return null;
-  const tetraDescriptors=[],stereocenters=atoms.map((atom,i)=>atom.stereo?i:-1).filter(i=>i>=0);
-  const cipGraph={atoms,bonds:edges.map(e=>({a:e.a,b:e.c,o:e.o,dir:e.dir,dirFrom:e.dirFrom}))};
-  if(stereocenters.length){
-    if(stereocenters.some(i=>!pos.has(i)))return null;
-    for(const i of stereocenters){
-      let descriptor;
-      try{descriptor=cipTetraDescriptor(cipGraphContext(cipGraph),i);}catch(error){return null;}
-      if(!descriptor)return null;
-      tetraDescriptors.push({loc:pos.get(i),kind:descriptor});
-    }
+  const tetraDescriptors=[];
+  for(let i=0;i<atoms.length;i++)if(atoms[i].stereo){
+    let descriptor;
+    try{descriptor=cipTetraDescriptor(cipGraphContext(cipGraph),i);}catch(error){return null;}
+    if(!descriptor){if(hasEquivalentTetrahedralLigands(cipGraph,i))continue;return null;}
+    if(!pos.has(i))return null;
+    tetraDescriptors.push({loc:pos.get(i),kind:descriptor});
   }
   const addStereoDescriptors=name=>{
     if(!name)return name;
@@ -6934,7 +7008,8 @@ function namedGraphsEquivalent(source,candidate){
       const dirFrom=bond.dirFrom===undefined?undefined:(idToIndex.has(bond.dirFrom)?idToIndex.get(bond.dirFrom):bond.dirFrom);
       bonds.push({...bond,a,b,dirFrom});
     }
-    const base={atoms,bonds},adj=atoms.map(()=>[]),bondSums=new Array(atoms.length).fill(0),bondByKey=new Map();
+    const base={atoms,bonds};normalizeNonStereogenicTetrahedralMarks(base);
+    const adj=atoms.map(()=>[]),bondSums=new Array(atoms.length).fill(0),bondByKey=new Map();
     for(const bond of bonds){const key=pairKey(bond.a,bond.b);if(bondByKey.has(key))return null;bondByKey.set(key,bond);adj[bond.a].push(bond.b);adj[bond.b].push(bond.a);bondSums[bond.a]+=bond.o;bondSums[bond.b]+=bond.o;}
     const implicitHydrogens=atoms.map((atom,i)=>{
       const h=Number.isInteger(atom.hx)?atom.hx:Number.isInteger(atom.hExplicit)?atom.hExplicit:implicitH(atom.el,atom.q||0,bondSums[i]);
@@ -7380,19 +7455,20 @@ function renderName(subs,base,kind,suffixLocs,doubles,triples,cyclic=false,aroma
   const groups=new Map();for(const x of subs){if(!x.name)continue;if(!groups.has(x.name))groups.set(x.name,[]);groups.get(x.name).push(x.loc);}
   const mult=IUPAC_MULTIPLIERS;
   if([...groups.values()].some(locs=>locs.length>IUPAC_MAX_MULTIPLIER_COUNT))return null;
-  const prefixCount=[...groups.values()].reduce((count,locs)=>count+locs.length,0);
-  const omitPrefixLocants=parentLength===1||(prefixCount===1&&parentIsVertexTransitive(parentLength,cyclic,doubles,triples,suffixLocs));
-  const prefixEntries=[...groups].map(([name,locs])=>{
-    locs.sort((a,b)=>a-b);const citedName=/^(?:\d+(?:,\d+)*-)/.test(name)||/-\d+(?:,\d+)*-/.test(name)||name.endsWith('amino')&&name!=='amino'?'('+name+')':name;
-    return{name,locants:locs,text:(omitPrefixLocants?'':locs.join(',')+'-')+(mult[locs.length]||'')+citedName};
-  });
   const nCounts=new Map();for(const name of nSubstituents)nCounts.set(name,(nCounts.get(name)||0)+1);
   if([...nCounts.values()].some(count=>count>IUPAC_MAX_MULTIPLIER_COUNT))return null;
-  for(const[name,count]of nCounts){
-    const complex=/^[a-z]+an-\d+-il$/.test(name),cited=complex?'('+name+')':name;
-    prefixEntries.push({name,locants:[],text:count===1?'N-'+cited:Array(count).fill('N').join(',')+'-'+mult[count]+cited});
-  }
-  prefixEntries.sort((a,b)=>comparePrefixNames(a.name,b.name)||compareNumberingScores(a.locants,b.locants));
+  const prefixCount=[...groups.values()].reduce((count,locants)=>count+locants.length,0)+nSubstituents.length;
+  const omitPrefixLocants=parentLength===1||(prefixCount===1&&parentIsVertexTransitive(parentLength,cyclic,doubles,triples,suffixLocs));
+  const prefixNames=new Set([...groups.keys(),...nCounts.keys()]);
+  if([...prefixNames].some(name=>(groups.get(name)?.length||0)+(nCounts.get(name)||0)>IUPAC_MAX_MULTIPLIER_COUNT))return null;
+  const prefixEntries=[...prefixNames].map(name=>{
+    const numericLocants=(groups.get(name)||[]).sort((a,b)=>a-b),nitrogenCount=nCounts.get(name)||0;
+    const orderLocants=[...Array(nitrogenCount).fill('N'),...numericLocants].sort(comparePrefixLocants),count=orderLocants.length;
+    const citedName=/^(?:\d+(?:,\d+)*-)/.test(name)||/-\d+(?:,\d+)*-/.test(name)||name.endsWith('amino')&&name!=='amino'?'('+name+')':/^[a-z]+an-\d+-il$/.test(name)?'('+name+')':name;
+    const locantText=orderLocants.length&&!(omitPrefixLocants&&!nitrogenCount)?orderLocants.join(',')+'-':'';
+    return{name,orderLocants,text:locantText+(mult[count]||'')+citedName};
+  });
+  prefixEntries.sort((a,b)=>comparePrefixNames(a.name,b.name)||comparePrefixLocants(a.orderLocants,b.orderLocants));
   let prefix=prefixEntries.map(entry=>entry.text).join('-');
   const hydride=base+'o';
   let body=hydride;
